@@ -87,6 +87,38 @@ window.SPONSORS = (() => {
       S('Laguna Surf Shack', 'surf', ['Board rentals by the hour.', 'Lessons every morning at seven.'], 'Laguna Beach', '555-0136', '#0e3448', '#ffd06a'),
       skyarium('San Francisco'),
     ],
+    RW1968: [ // 1979
+      S('Desert Lanes', 'bowling', ['40 lanes with air conditioning.', 'Leagues every night of the week.'], 'Phoenix, by Sky Harbor', '555-0101', '#4a2a14', '#ffd23c'),
+      S('Saguaro Steakhouse', 'food', ['Mesquite steaks and cowboy beans.', 'Cowboy music on weekends.'], 'Scottsdale', '555-0117', '#3a1a0e', '#ffb070'),
+      S('Starlite Motor Lodge', 'motel', ['Pool, color TV and free coffee.', 'A block off the Strip.'], 'Las Vegas', '555-0143', '#2a0e3a', '#ff9ae0'),
+      S('Pioneer Pinball', 'arcade', ['Fifty pinball machines.', 'Two plays a quarter till noon.'], 'Seattle, Pioneer Square', '555-0172', '#102a2a', '#7af0d0'),
+      S('Sawtooth Ski Rental', 'ski', ['Skis, boots and poles by the day.', 'Wax while you wait.'], 'Ketchum, Idaho', '555-0161', '#2a3c5a', '#cfe8ff'),
+      skyarium('Phoenix'),
+    ],
+    PE1981: [
+      S('Ironbound Grill', 'food', ['Portuguese steak on a hot stone.', 'Paella for two on Sundays.'], 'Ironbound, Newark', '555-0118', '#3a1a0e', '#ffcf6a'),
+      S('Exit 13A Motor Lodge', 'motel', ['Shuttle to every terminal.', 'Color TV and free ice.'], 'Off the Turnpike', '555-0144', '#4a1a14', '#ffb070'),
+      S('Boardwalk Arcade', 'arcade', ['Skee-ball and every new video game.', 'Prizes at the counter.'], 'Seaside Heights', '555-0173', '#1a1030', '#ff7ae0'),
+      S('Garden State Video', 'video', ['VHS and Beta for rent.', 'Two movies and a VCR for ten dollars.'], 'Route 22, Union', '555-0190', '#1a1a3a', '#a0b8ff'),
+      S('Bayonne Bowl', 'bowling', ['36 lanes. Leagues forming now.', 'Shoes free on Tuesdays.'], 'Bayonne', '555-0103', '#16324a', '#ffd23c'),
+      skyarium('Newark'),
+    ],
+    BI1928: [ // 1979
+      S('Lone Star Lanes', 'bowling', ['48 lanes and a snack bar.', 'Moonlight bowling Saturdays.'], 'Irving, by the airport', '555-0104', '#16324a', '#ffd23c'),
+      S('Stockyards Chili Parlor', 'food', ['Bowl of red with crackers.', 'No beans. Never beans.'], 'Fort Worth', '555-0122', '#4a140e', '#ffb070'),
+      S('Metroplex TV Repair', 'tv', ['Color sets fixed while you wait.', 'House calls in Dallas and Fort Worth.'], 'Grand Prairie', '555-0158', '#3b2a1c', '#ffcf8a'),
+      S('Terminal Boot Shine', 'shine', ['Boots shined while you wait.', 'Ostrich and lizard too.'], 'Inside the airport', '555-0153', '#2a1a0e', '#ffe0a0'),
+      S('Eighteenth & Vine Records', 'record', ['Jazz and blues on vinyl.', 'Live music Saturday afternoons.'], 'Kansas City', '555-0194', '#1a1a1a', '#ff7a7a'),
+      skyarium('Dallas'),
+    ],
+    MC1981: [
+      S('Space City Arcade', 'arcade', ['Forty games. Tokens four for a dollar.', 'Open till midnight.'], 'Houston', '555-0175', '#1a1030', '#7ad0ff'),
+      S('Lemmon Avenue Diner', 'food', ['Chicken-fried steak and cream gravy.', 'Pie by the slice all day.'], 'Dallas', '555-0124', '#3a1a0e', '#ffcf6a'),
+      S('Telephone Road Motor Inn', 'motel', ['Five minutes from Hobby.', 'Pool and free cable.'], 'Houston', '555-0147', '#4a1a14', '#ffb070'),
+      S('Galveston Boat Rental', 'boat', ['Runabouts by the hour.', 'Bait and ice at the dock.'], 'Galveston', '555-0162', '#0e3a4a', '#9af0e8'),
+      S('Sixth Street Records', 'record', ['Texas music and new wave.', 'Listening booths in the back.'], 'Austin', '555-0195', '#1a1a1a', '#ffd06a'),
+      skyarium('Houston'),
+    ],
   };
 })();
 

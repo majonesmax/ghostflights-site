@@ -132,7 +132,8 @@
   const WEATHER_LEN = 12000; // the weather only the last 12 seconds of its slot; the shot before it runs on
   const K = 1440 / B.board.width; // the board's pixels to the frame's
   const INK = { NWA: '#b02822', RC1979: '#2858a0', WA1926: '#cc6028', EA1926: '#288cbe', PS1949: '#c43478', OZ1950: '#2e8048',
-    TW1930: '#d23a46', PA1927: '#1d4fa0', PI1948: '#5b4ea8', OC1967: '#e2581f' };
+    TW1930: '#d23a46', PA1927: '#1d4fa0', PI1948: '#5b4ea8', OC1967: '#e2581f',
+    RW1968: '#3446a8', PE1981: '#801e2e', BI1928: '#b5432a', MC1981: '#643c96' };
   // The wide shot and the weather; the hub cameras below.
   const WIDE = { name: 'Cam A', scale: 1, x: 720, y: 540 };
   const WEATHER = { name: 'Weather', scale: 1, x: 720, y: 540, weather: true };
@@ -174,11 +175,13 @@
   const routeByPair = new Map(B.routes.map((r) => [`${r.airline}:${[r.from, r.to].sort().join('-')}`, r]));
   const SCHEDULE = Ghostflights.engine(DATA);
   const noteDate = Ghostflights.noteDate;
+  // A type painted several ways (Braniff's colors): its flight number picks one, so a flight always has the same color.
+  const paint = (type, number) => (type.paints ? type.paints[type.deck[number % type.deck.length]] : type);
   function scheduledAt(t, out) {
     for (const g of SCHEDULE.airborne(t)) {
       const route = routeByPair.get(`${g.airline}:${[g.from, g.to].sort().join('-')}`);
       if (!route) continue;
-      out.push({ ...g, fleet: B.airlines[g.airline].fleet[g.kind], route, u: route.from === g.from ? g.along : 1 - g.along, east: route.from === g.from });
+      out.push({ ...g, fleet: paint(B.airlines[g.airline].fleet[g.kind], g.number), route, u: route.from === g.from ? g.along : 1 - g.along, east: route.from === g.from });
     }
   }
 
@@ -770,7 +773,7 @@
 
   new FontFace('CG', `url(${window.CG_FONT})`).load().then(async (font) => {
     document.fonts.add(font);
-    const sprites = Object.values(B.airlines).flatMap((a) => Object.values(a.fleet).flatMap((f) => [`sprites/${f.sprite}-left.svg`, `sprites/${f.sprite}-right.svg`]));
+    const sprites = Object.values(B.airlines).flatMap((a) => Object.values(a.fleet).flatMap((t) => t.paints || [t]).flatMap((f) => [`sprites/${f.sprite}-left.svg`, `sprites/${f.sprite}-right.svg`]));
     // A cutout that won't bake shows its plain drawing rather than stop the broadcast.
     await Promise.all(sprites.map((src) => bake(src).catch(() => baked.set(src, window.SPRITES[src]))));
     bakeBig(sprites.filter((s) => s.endsWith('-left.svg'))); // the card and the break only show the left side

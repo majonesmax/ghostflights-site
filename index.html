@@ -34,11 +34,12 @@
     text-shadow: 0 0.04em 0 #2c180c, 0 -0.03em 0 rgba(255, 255, 255, 0.4); }
   .cabinet .grille { flex: 1; height: 1.3em; margin: 0 1.6em; border-radius: 0.2em;
     background: repeating-linear-gradient(90deg, #2b1a10 0 0.12em, #6a4026 0.12em 0.36em); opacity: 0.85; }
-  /* The set's two knobs, its only controls: channel (0, the guide, to 5, printed round it) and volume (off and on).
+  /* The set's two knobs, its only controls: channel (its numbers on the knob's skirt, the one under the pointer on) and
+     volume (off and on).
      A click turns one a notch. --k makes them bigger where the set is small (phones), so they're easy to hit. */
   .cabinet .control, .dock .control { display: flex; flex-direction: column; align-items: center; margin-left: 1.1em; font-size: calc(1em * var(--k, 1)); }
-  .cabinet .dial, .dock .dial { position: relative; width: 3.6em; height: 3em; }
-  .cabinet .dial span, .dock .dial span { position: absolute; left: 50%; top: 58%; font: 700 0.42em/1 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #e9dcc4;
+  .cabinet .dial, .dock .dial { position: relative; width: 3.6em; height: 4.4em; }
+  .cabinet .dial > span:not(.pointer), .dock .dial > span:not(.pointer) { position: absolute; left: 50%; top: 58%; font: 700 0.42em/1 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #e9dcc4;
     transform: translate(-50%, -50%) rotate(var(--a)) translateY(-3.55em) rotate(calc(-1 * var(--a))); }
   .cabinet .knob, .dock .knob { position: absolute; left: 50%; top: 58%; width: 2.2em; height: 2.2em; margin: -1.1em 0 0 -1.1em; padding: 0; border: 0; border-radius: 50%;
     cursor: pointer; transform: rotate(var(--turn, 0deg)); transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1);
@@ -46,6 +47,21 @@
     box-shadow: 0 0.15em 0.25em rgba(0, 0, 0, 0.6), inset 0 0 0 0.12em rgba(60, 40, 20, 0.35); -webkit-tap-highlight-color: transparent; }
   .cabinet .knob::after, .dock .knob::after { content: ""; position: absolute; left: 50%; top: 0.14em; width: 0.16em; height: 0.75em; margin-left: -0.08em; border-radius: 0.08em; background: #3a2a1c; }
   .cabinet .knob:focus-visible, .dock .knob:focus-visible { outline: 0.1em solid #f7c98b; outline-offset: 0.12em; }
+  /* The channel knob, a VHF clicker: a dark skirt with the channels round it and a cream grip, turning all the way round
+     under a fixed pointer. */
+  .cabinet .dial:has(.channel), .dock .dial:has(.channel) { width: 4.6em; }
+  .cabinet .knob.channel, .dock .knob.channel { top: 50%; width: 4.4em; height: 4.4em; margin: -2.2em 0 0 -2.2em;
+    background: radial-gradient(circle, transparent 1.07em, #1c140d 1.1em, #2a1d13 2.15em, #15100a 2.2em); }
+  .knob.channel::after { display: none; }
+  .knob.channel .grip { position: absolute; inset: 1.1em; border-radius: 50%; box-shadow: 0 0.06em 0.14em rgba(0, 0, 0, 0.75);
+    background: repeating-conic-gradient(rgba(0, 0, 0, 0.16) 0 5deg, transparent 5deg 15deg), radial-gradient(circle at 35% 30%, #efe6d4, #b3a48c 60%, #75664f); }
+  .knob.channel .num { position: absolute; left: 50%; top: 50%; font: 700 0.6em/1 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.06em;
+    color: #e9dcc4; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-2.8em); }
+  /* The pointer rides with the knob, turned back as far as the knob turns, so it stays at the top. */
+  .knob.channel .pointer { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin: -0.2em 0 0 -0.32em;
+    border: 0.32em solid transparent; border-top: 0.42em solid #f7c98b; border-bottom: 0;
+    transform: rotate(calc(-1 * var(--turn, 0deg))) translateY(-2.6em); transform-origin: 0.32em 0.2em;
+    transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1); }
   .cabinet .caption, .dock .caption { margin-top: 0.1em; font: 700 0.4em/1 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: 0.16em; color: #e9dcc4; }
   /* A line of links on the land under the set. */
   .links { position: fixed; left: 0; right: 0; bottom: 14px; text-align: center; font: 500 13px/1.4 -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #f3ede4cc; }
@@ -87,7 +103,7 @@
   <div class="bezel"></div>
   <div class="panel"><span class="badge">Skyarium</span><span class="grille"></span>
     <div class="control"><div class="dial"><span style="--a: -50deg">OFF</span><span style="--a: 50deg">ON</span><button class="knob volume" aria-label="Volume (M)"></button></div><span class="caption">VOLUME</span></div>
-    <div class="control"><div class="dial"><button class="knob channel" aria-label="Channel (arrow keys, 0 to 9)"></button></div><span class="caption">CHANNEL</span></div>
+    <div class="control"><div class="dial"><button class="knob channel" aria-label="Channel: click the left side to go down, the right side to go up (or the arrow keys)"></button></div><span class="caption">CHANNEL</span></div>
   </div>
 </div>
 <div class="set">
@@ -131,10 +147,13 @@
     snowCtx.putImageData(img, 0, 0);
     requestAnimationFrame(hiss);
   }
-  // The channel knob points at the channel, its numbers printed round it from -75° to 75°. Past the last it swings
-  // back to 0, as a dial with a stop does.
-  const NOTCH = 150 / (CHS.length - 1);
-  channelKnob.parentElement.prepend(...CHS.map((c, i) => Object.assign(document.createElement('span'), { textContent: c, style: `--a: ${-75 + NOTCH * i}deg` })));
+  // The channel knob: the channels round its skirt, the one at the top (under the pointer) on. It turns all the way
+  // round, past the last channel to 0 and on, always the short way.
+  const NOTCH = 360 / CHS.length;
+  channelKnob.append(Object.assign(document.createElement('span'), { className: 'grip' }),
+    ...CHS.map((c, i) => Object.assign(document.createElement('span'), { className: 'num', textContent: c, style: `--a: ${NOTCH * i}deg` })));
+  channelKnob.append(Object.assign(document.createElement('span'), { className: 'pointer' }));
+  let turned = 0; // the knob's angle, kept running so it never spins back the long way
   // A watchdog on every change of channel: no picture in 12 seconds and the set tunes again; no picture the second
   // time and it says NO SIGNAL rather than leave the snow up. What went wrong is kept (window.setLog) and shown.
   let watchdog = 0;
@@ -148,7 +167,9 @@
       else { snowing = false; osd('NO SIGNAL', 60000); }
     }, 12000);
     ch = next;
-    channelKnob.style.setProperty('--turn', `${-75 + NOTCH * CHS.indexOf(ch)}deg`);
+    const want = -NOTCH * CHS.indexOf(ch), step = ((want - turned) % 360 + 540) % 360 - 180;
+    turned += step;
+    channelKnob.style.setProperty('--turn', `${turned}deg`);
     const q = new URLSearchParams({ ch });
     for (const k of ['t', 'speed']) if (params.get(k)) q.set(k, params.get(k));
     history.replaceState(null, '', `?${new URLSearchParams({ ...Object.fromEntries(params), ch })}`);
@@ -230,7 +251,12 @@
     return true;
   }
   addEventListener('keydown', (e) => { if (!e.metaKey && !e.ctrlKey && press(e.key)) e.preventDefault(); });
-  channelKnob.addEventListener('click', () => { if (soundWanted) { soundWanted = false; sound(true); } surf(1); });
+  // A click on the knob's left half turns it down a channel, on its right half up (from the keyboard, up).
+  channelKnob.addEventListener('click', (e) => {
+    if (soundWanted) { soundWanted = false; sound(true); }
+    const r = channelKnob.getBoundingClientRect();
+    surf(e.detail && e.clientX < r.left + r.width / 2 ? -1 : 1);
+  });
   volumeKnob.addEventListener('click', () => { soundWanted = false; sound(!Muzak.playing()); });
   addEventListener('message', (e) => {
     if (e.source === national.contentWindow && e.data) {
@@ -282,7 +308,7 @@
     // Knobs at least 40px across: on a small set, the panel grows to hold them.
     const layout = (s) => {
       const w = 1440 * s, em = w / 42, k = Math.max(1, 40 / (2.2 * em));
-      const bottom = Math.max(0.15, em * (3.6 * k + 0.3) / (1080 * s));
+      const bottom = Math.max(0.15, em * (5 * k + 0.3) / (1080 * s)); // the dials and their captions
       return { w, h: 1080 * s, em, k, bottom, cw: w * (1 + 2 * CAB.side), ch: 1080 * s * (1 + CAB.top + bottom) };
     };
     let s = Math.min(fitW / (1440 * (1 + 2 * CAB.side)), fitH / (1080 * 1.2));
