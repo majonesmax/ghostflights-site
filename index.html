@@ -117,8 +117,10 @@
 <div class="dock"></div>
 <nav class="links"><a class="site" href="about.html">ghostflights.tv</a><a href="timetable.html">Timetables</a><a href="about.html">About</a><a href="api.html">API</a><button class="size" type="button">Bigger picture</button><a href="https://skyarium.app">Skyarium</a><a class="ol" href="https://majonesmax.github.io/open-liveries/">Open Liveries</a></nav>
 <script>
-  // A phone opens on the timetables (the set is too small to watch there); ?tv=1 or a channel asks for the set anyway.
-  if (matchMedia('(max-width: 700px)').matches && !/[?&](tv|ch)=/.test(location.search)) location.replace('timetable.html');
+  // A phone opens on the timetables. The station is too heavy to run there, so asked for the set anyway (?tv=1 or a
+  // channel) its screen shows a card instead (phone.html) and nothing else loads.
+  window.PHONE = matchMedia('(max-width: 700px), (pointer: coarse) and (max-height: 500px)').matches;
+  if (window.PHONE && !/[?&](tv|ch)=/.test(location.search)) location.replace('timetable.html');
 </script>
 <script src="channels.js"></script>
 <script src="music.js"></script>
@@ -185,7 +187,7 @@
     if (!snowing) { snowing = true; hiss(); }
     osd(chName(ch), 60000);
     Muzak.tune(ch); // the music cuts to static until the picture is in
-    screen.src = `${ch === '0' ? 'guide' : 'station'}.html?${q}`;
+    screen.src = window.PHONE ? `phone.html?ch=${ch}` : `${ch === '0' ? 'guide' : 'station'}.html?${q}`;
   }
   function tunedIn() {
     clearTimeout(watchdog);
@@ -241,7 +243,7 @@
       national.title = `Ghostflights, ${title.toLowerCase()}`;
       const q = new URLSearchParams({ ch: board, host: ch });
       for (const k of ['t', 'speed']) if (params.get(k)) q.set(k, params.get(k));
-      national.src = want ? `station.html?${q}` : 'about:blank';
+      national.src = want && !window.PHONE ? `station.html?${q}` : 'about:blank';
     }
     const showing = !!want && acrossReady && into >= 0;
     national.style.visibility = showing ? 'visible' : 'hidden';
