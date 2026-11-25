@@ -32,6 +32,13 @@
   .marker.ghost { display: none; }
   .camera.wide svg.arcs path:first-child { stroke-width: 2.6; }
   .camera.wide svg.arcs path:last-child { stroke-width: 1.3; }
+  /* A region's board (Pan Am's world) is a much bigger piece of the map: its routes long and its flights few, so its
+     lines go bolder and its pins a size up, to read as clearly as a country's board. */
+  .camera.region svg.arcs path:first-child { stroke-width: 7; }
+  .camera.region svg.arcs path:last-child { stroke-width: 3.8; }
+  .camera.region.wide svg.arcs path:first-child { stroke-width: 6; }
+  .camera.region.wide svg.arcs path:last-child { stroke-width: 3.4; }
+  .camera.region .marker::after { transform: scale(1.25); }
   /* Everything over the board lets clicks through to the planes. */
   .light, .scan, canvas.cg, canvas.crawl, canvas.card { pointer-events: none; }
   .arcs, .markers { transition: none; }
@@ -118,6 +125,7 @@
   const CH = DATA.boards[params.get('ch')] ? params.get('ch') : homeChannel();
   // "Across the country": the national board as a segment of an airline's channel (the set shows it now and then,
   // ?host= naming the channel): that airline's whole network coast to coast. One wide shot, no break-ins of its own.
+  // Pan Am's is "Around the world", one of its regions (the board's name says which).
   const HOST = params.get('host'), SEGMENT = !!HOST;
   const BD = DATA.boards[CH];
   const B = { board: { image: BD.image, labels: BD.labels, width: BD.width }, routes: BD.routes, airports: BD.airports, positions: DATA.positions, cities: DATA.cities, airlines: DATA.airlines };
@@ -203,6 +211,7 @@
   // The board.
   const stage = document.querySelector('.stage');
   const camera = document.querySelector('.camera');
+  camera.classList.toggle('region', !!BD.region);
   // The board, decoded before the picture is shown (the set's snow lasts until then); tried again if it fails or
   // stalls, so a channel never rolls in on an empty board.
   const boardImg = document.querySelector('.board');
@@ -258,7 +267,7 @@
     // With an airline featured: its routes as its route map drew them (those flying now strongest), no one else's.
     for (const [key, el] of arcEls) {
       if (!focus) el.style.opacity = live.has(key) ? 1 : 0.035;
-      else el.style.opacity = key.startsWith(`${focus}:`) ? (live.has(key) ? 1 : 0.3) : 0;
+      else el.style.opacity = key.startsWith(`${focus}:`) ? (live.has(key) ? 1 : BD.region ? 0.8 : 0.3) : 0;
     }
     for (const [key, m] of markers) m.classList.toggle('ghost', !!focus && !key.startsWith(`${focus}:`));
   }
@@ -471,7 +480,7 @@
     const [x2] = bez(f.route, Math.min(Math.max(f.u + (f.east ? 0.01 : -0.01), 0), 1));
     const src = baked.get(`sprites/${f.fleet.sprite}-${x2 >= x ? 'right' : 'left'}.svg`);
     if (hero.src !== src) hero.src = src;
-    hero.style.width = `${1.5 * ({ B747: 128, DC10: 118, L101: 118, A30B: 112, B752: 100, B462: 82, CV580: 80 }[f.kind] || 94)}px`; // by length, roughly, and large
+    hero.style.width = `${1.5 * ({ B747: 128, B74S: 112, DC10: 118, L101: 118, L15: 112, A30B: 112, B752: 100, B462: 82, CV580: 80 }[f.kind] || 94)}px`; // by length, roughly, and large
     hero.style.left = `${x}px`; hero.style.top = `${y}px`; hero.style.display = 'block';
     if (markers.get(f.key)) markers.get(f.key).classList.add('hero-on');
   }
@@ -533,8 +542,10 @@
       // The bug, in the board's emptier top corner (build_sim.py picks it).
       const [bx, ba] = BD.bug === 'left' ? [24, 'left'] : [456, 'right'];
       text('Ghostflights', bx, 33, 12, AMBER, ba);
-      text(SEGMENT ? `CH ${HOST} · ${DATA.boards[HOST].name} · ${BD.name}` : `CH ${CH} · ${BD.name} · ${cam.name}`, bx, 48, 14, WHITE, ba);
-      text(clock.format(new Date(t)), bx, 62, 14, WHITE, ba);
+      // A region "Around the world" (Pan Am's) names the region on the clock's line, keeping the bug's lines short.
+      const [segment, region] = BD.name.split(' · ');
+      text(SEGMENT ? `CH ${HOST} · ${DATA.boards[HOST].name} · ${segment}` : `CH ${CH} · ${BD.name} · ${cam.name}`, bx, 48, 14, WHITE, ba);
+      text(SEGMENT && region ? `${region} · ${clock.format(new Date(t))}` : clock.format(new Date(t)), bx, 62, 14, WHITE, ba);
       if (weatherUp && titled) drawWeatherTitle(t);
       showHero(weatherUp || arrived ? null : f);
       if (f && !weatherUp && !arrived) {

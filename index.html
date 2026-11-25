@@ -216,19 +216,24 @@
 
   // "Across the country": every five minutes each airline's channel cuts to the national board, its airline's whole
   // network coast to coast, for 45 seconds, then back; the clock decides, so every viewer sees it together. The national picture loads in a
-  // second screen a few seconds before (no snow), and goes when the segment ends. Not on the guide.
+  // second screen a few seconds before (no snow), and goes when the segment ends. Not on the guide. An airline flying the
+  // world (Pan Am) goes "Around the world" instead: one of its regions' boards a segment, in turn (channels.js).
   const national = set.querySelector('iframe.national');
   const ACROSS = { every: 300000, length: 45000, at: 150000, early: 8000 };
   const SPEED = +(params.get('speed') || 1), START_REAL = Date.now(), START = params.get('t') ? Date.parse(params.get('t')) : START_REAL;
   const clockNow = () => START + (Date.now() - START_REAL) * SPEED;
-  let acrossFor = '', acrossReady = false;
+  let acrossFor = '', acrossReady = false, acrossBoard = '';
   function across() {
     const t = clockNow(), slot = Math.floor((t - ACROSS.at + ACROSS.early) / ACROSS.every);
     const into = t - (slot * ACROSS.every + ACROSS.at); // ms into this slot's segment (negative while loading)
     const want = ch !== '0' && into > -ACROSS.early && into < ACROSS.length ? `${ch}:${slot}` : '';
     if (want !== acrossFor) {
       acrossFor = want; acrossReady = false;
-      const q = new URLSearchParams({ ch: `N${ch}`, host: ch });
+      const turns = (window.BOARD_ACROSS || {})[ch] || [[`N${ch}`, 'Across the country']];
+      const [board, title] = turns[((slot % turns.length) + turns.length) % turns.length];
+      acrossBoard = board;
+      national.title = `Ghostflights, ${title.toLowerCase()}`;
+      const q = new URLSearchParams({ ch: board, host: ch });
       for (const k of ['t', 'speed']) if (params.get(k)) q.set(k, params.get(k));
       national.src = want ? `station.html?${q}` : 'about:blank';
     }
@@ -260,7 +265,7 @@
   volumeKnob.addEventListener('click', () => { soundWanted = false; sound(!Muzak.playing()); });
   addEventListener('message', (e) => {
     if (e.source === national.contentWindow && e.data) {
-      if (e.data.ready === `N${ch}`) acrossReady = true;
+      if (e.data.ready === acrossBoard) acrossReady = true;
       if (e.data.key) press(e.data.key);
       if (e.data.swipe) surf(e.data.swipe);
       return;

@@ -68,13 +68,15 @@
   // the same engine the station flies by).
   const SCHEDULE = Ghostflights.engine(DATA), then1985 = Ghostflights.then1985;
   function departures(ch, from, to) {
-    const board = DATA.boards[ch], onBoard = board.airports, byAirport = {}, airlines = new Set();
-    // "Busiest" counts only airports well inside the board, not one at its edge.
-    const inside = ([x, y]) => x > 0.08 * board.width && x < 0.92 * board.width && y > 0.08 * board.height && y < 0.92 * board.height;
-    const all = SCHEDULE.departures(from, to, (c) => !!onBoard[c]).filter((g) => !board.airline || g.airline === board.airline);
+    // A channel flying the world (Pan Am) counts the cities on all its regions' boards.
+    const board = DATA.boards[ch], regions = [board, ...(board.across || []).map((k) => DATA.boards[k])], byAirport = {}, airlines = new Set();
+    // "Busiest" counts only airports well inside a board, not one at its edge.
+    const inside = (b, [x, y]) => x > 0.08 * b.width && x < 0.92 * b.width && y > 0.08 * b.height && y < 0.92 * b.height;
+    const onBoard = (c) => regions.some((b) => b.airports[c]);
+    const all = SCHEDULE.departures(from, to, onBoard).filter((g) => !board.airline || g.airline === board.airline);
     for (const g of all) {
       airlines.add(g.airline);
-      if (inside(onBoard[g.origin])) byAirport[g.origin] = (byAirport[g.origin] || 0) + 1;
+      if (regions.some((b) => b.airports[g.origin] && inside(b, b.airports[g.origin]))) byAirport[g.origin] = (byAirport[g.origin] || 0) + 1;
     }
     const busiest = Object.entries(byAirport).sort((a, b) => b[1] - a[1])[0];
     return { count: all.length, airlines: [...airlines], busiest: busiest && busiest[0] };
@@ -108,6 +110,7 @@
     ['Numbers', 'Flight numbers and times are as printed in each airline\'s timetable.'],
     ['Northwest', 'System timetable of October 27 1985. Northwest Airlines History Center.'],
     ['Republic', 'City schedules from 1984 to 1986. Northwest Airlines History Center.'],
+    ['Pan Am', 'System timetable of February 15 1985. University of Miami Libraries, Pan American World Airways, Inc. records.'],
     ['The rest', 'Official Airline Guide of February 15 1985 as transcribed at departedflights.com.'],
     ['Hughes Airwest and Braniff', 'Gone by 1985, so they fly in 1979. Official Airline Guide of November 15 1979 as transcribed at departedflights.com.'],
     ['Weather', 'This hour on this date in 1985 (1979 for Hughes Airwest and Braniff). Open-Meteo.com from the ERA5 archive.'],

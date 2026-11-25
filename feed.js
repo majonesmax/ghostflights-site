@@ -11,11 +11,12 @@
   const DAY = 86400000;
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  // A timetable's date notes ("until November 14", "from November 15"); the timetables ran from October 1985 into 1986.
+  // A timetable's date notes ("until November 14", "from November 15"): a bare date is from an autumn 1985 timetable
+  // running into 1986; one with its year says it ("March 31 1985", Pan Am's of February 1985).
   const noteDate = (s) => {
-    const [month, day] = s.split(' ');
+    const [month, day, year] = s.split(' ');
     const m = MONTHS.indexOf(month);
-    return Date.UTC(m < 9 ? 1986 : 1985, m, +day);
+    return Date.UTC(year ? +year : m < 9 ? 1986 : 1985, m, +day);
   };
   // Day number d (days since 1970, UTC) on an airline's calendar: the same month and date, in its year (1985, or 1979
   // for an airline that was gone by 1985).
