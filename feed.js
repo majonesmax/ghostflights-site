@@ -5,7 +5,7 @@
 // In a page: <script src="feed-data.js"></script><script src="feed.js"></script>, then Ghostflights.feed().
 // In Node: require('./feed-data.js'); require('./feed.js'); globalThis.Ghostflights.feed().
 //
-// Every record says it's simulated and from 1985. There's no ICAO address, and flight numbers appear only where a
+// Every record says it's simulated and its year (1985, or 1979 for Hughes Airwest). There's no ICAO address, and flight numbers appear only where a
 // timetable printed them, so nothing here can pass for real traffic.
 (function (root) {
   const DAY = 86400000;
@@ -17,15 +17,17 @@
     const m = MONTHS.indexOf(month);
     return Date.UTC(m < 9 ? 1986 : 1985, m, +day);
   };
-  // Day number d (days since 1970, UTC) on the 1985 calendar: the same month and date, in 1985.
-  const then1985 = (d) => {
+  // Day number d (days since 1970, UTC) on an airline's calendar: the same month and date, in its year (1985, or 1979
+  // for an airline that was gone by 1985).
+  const thenIn = (d, year = 1985) => {
     const date = new Date(d * DAY);
-    return Date.UTC(1985, date.getUTCMonth(), Math.min(date.getUTCDate(), date.getUTCMonth() === 1 ? 28 : 31));
+    return Date.UTC(year, date.getUTCMonth(), Math.min(date.getUTCDate(), date.getUTCMonth() === 1 ? 28 : 31));
   };
-  // Whether a schedule row flies on day d: its weekday in 1985, within its date notes.
-  function flies(row, d) {
+  const then1985 = (d) => thenIn(d, 1985);
+  // Whether a schedule row flies on day d: its weekday in its airline's year, within its date notes.
+  function flies(row, d, year = 1985) {
     const [, , , , , , mask, starts, ends] = row;
-    const then = then1985(d);
+    const then = thenIn(d, year);
     if (!((mask >> ((new Date(then).getUTCDay() + 6) % 7)) & 1)) return false;
     return !((starts && then < noteDate(starts)) || (ends && then > noteDate(ends)));
   }
@@ -57,7 +59,7 @@
             const blockMs = block * 60000;
             if (t < depart || t >= depart + blockMs) continue;
             const along = (t - depart) / blockMs;
-            if (along < 0.04 || along > 0.96 || !flies(row, d)) continue;
+            if (along < 0.04 || along > 0.96 || !flies(row, d, airline.year)) continue;
             const nm = km(pos[from], pos[to]) / 1.852;
             const cruise = cruiseFt(nm, kind);
             out.push({ key: `${code}:${num}:${from}-${to}:${d}`, airline: code, number: num, from, to, kind, along, cruise,
@@ -77,7 +79,7 @@
           if (origins && !origins(origin)) continue;
           for (let d = first; d <= last; d++) {
             const depart = d * DAY + (offset + leave) * 60000;
-            if (depart >= from && depart < to && flies(row, d)) out.push({ airline: code, number: num, origin, depart });
+            if (depart >= from && depart < to && flies(row, d, airline.year)) out.push({ airline: code, number: num, origin, depart });
           }
         }
       }
@@ -109,13 +111,13 @@
       const climbing = f.alt < f.cruise && f.along < 0.5, descending = f.alt < f.cruise && f.along >= 0.5;
       return {
         simulated: true,
-        year: 1985,
+        year: airline.year || 1985,
         flight: `${airline.code} ${f.number}`,
         airline: airline.name,
         type: (airline.types && airline.types[f.kind]) || f.kind,
         from: f.from,
         to: f.to,
-        departed1985: new Date(then1985(f.d) + (f.depart - f.d * DAY)).toISOString().slice(0, 16) + 'Z',
+        departedThen: new Date(thenIn(f.d, airline.year) + (f.depart - f.d * DAY)).toISOString().slice(0, 16) + 'Z',
         lat: Math.round(at.lat * 1e4) / 1e4,
         lon: Math.round(at.lon * 1e4) / 1e4,
         track: Math.round(at.track),
@@ -127,5 +129,5 @@
     });
   }
 
-  root.Ghostflights = { engine, feed, flies, then1985, noteDate, cruiseFt, altitude, km };
+  root.Ghostflights = { engine, feed, flies, thenIn, then1985, noteDate, cruiseFt, altitude, km };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

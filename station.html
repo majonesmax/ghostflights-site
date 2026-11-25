@@ -132,7 +132,7 @@
   const WEATHER_LEN = 12000; // the weather only the last 12 seconds of its slot; the shot before it runs on
   const K = 1440 / B.board.width; // the board's pixels to the frame's
   const INK = { NWA: '#b02822', RC1979: '#2858a0', WA1926: '#cc6028', EA1926: '#288cbe', PS1949: '#c43478', OZ1950: '#2e8048',
-    TW1930: '#d23a46', PA1927: '#1d4fa0', PI1948: '#5b4ea8', OC1967: '#d9a21b' };
+    TW1930: '#d23a46', PA1927: '#1d4fa0', PI1948: '#5b4ea8', OC1967: '#e2581f' };
   // The wide shot and the weather; the hub cameras below.
   const WIDE = { name: 'Cam A', scale: 1, x: 720, y: 540 };
   const WEATHER = { name: 'Weather', scale: 1, x: 720, y: 540, weather: true };
@@ -224,11 +224,17 @@
   // into one a dark shade, between two other cities the ink itself. A bank shows as a hub ringed in dark, then light.
   const HUB_SET = new Set([BD.close, ...BD.cameras.map(([code]) => code)]);
   function shade(hex, f) {
-    const k = HUB_SET.has(f.from) ? 0.42 : HUB_SET.has(f.to) ? -0.35 : 0;
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-    const mix = (c) => Math.round(k > 0 ? c + (255 - c) * k : c * (1 + k));
-    return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+    // In lightness, kept clear of the cities' dark navy dots: a pin heading in only a little darker, never below 40%;
+    // one leaving clearly lighter.
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+    const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+    const h = !d ? 0 : max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    const base = Math.max(l, 0.44);
+    const L = HUB_SET.has(f.from) ? Math.min(0.8, base + 0.2) : HUB_SET.has(f.to) ? Math.max(0.4, base - 0.06) : base;
+    return `hsl(${Math.round((h * 60 + 360) % 360)}, ${Math.round(Math.min(1, s) * 100)}%, ${Math.round(L * 100)}%)`;
   }
+
   const markersEl = document.querySelector('.markers');
   const markers = new Map();
   let flights = [];
@@ -354,7 +360,7 @@
   // The broadcast is set in 1985: the weather is this hour on this date in 1985, from Open-Meteo's archive of the
   // ERA5 reanalysis (CC BY 4.0), at the board's bigger cities. Real history, said plainly. Without it there's no
   // weather segment: it's never made up.
-  const YEAR = 1985;
+  const YEAR = (BD.airline && B.airlines[BD.airline].year) || 1985; // the board's airline's year
   const WX_CITIES = BD.weather;
   const days = {}; // a 1985 date's hours, by city, once fetched
   let weather = null, weatherHour = '';
@@ -475,7 +481,7 @@
   const READ_X = 150, CRAWL_SPEED = 26; // the character generator's pixels, and its pixels a second (an unhurried read)
   let crawl = { for: '', items: [], start: 0, widths: [], total: 0 };
   function crawlItems(t, cam, weatherUp, pf, arrived) {
-    if (weatherUp) return [{ text: `${thenLabel(t)}   •   ` + weather.map((w) => `${city(w.code)} ${w.temp} ${SKY_WORDS[w.sky]}`).join('   •   ') + '   •   Weather of 1985 by Open-Meteo.com from ERA5' }];
+    if (weatherUp) return [{ text: `${thenLabel(t)}   •   ` + weather.map((w) => `${city(w.code)} ${w.temp} ${SKY_WORDS[w.sky]}`).join('   •   ') + `   •   Weather of ${YEAR} by Open-Meteo.com from ERA5` }];
     const who = (g) => `${short(g)} ${g.number}`;
     if (arrived) return [{ key: arrived.key, text: `${who(arrived)} from ${city(arrived.from)} has landed at ${city(arrived.to)}`, lit: true }];
     if (pf) {
@@ -680,7 +686,7 @@
       block(235, 247, 10, 10, AMBER);
       text('Ghostflights', 240, 120, 44, WHITE, 'center');
       text(`Channel ${CH} · ${BD.name}`, 240, 150, 16, AMBER, 'center');
-      text('Departed airlines on their 1985 schedules', 240, 290, 12, WHITE, 'center');
+      text(YEAR === 1985 ? 'Departed airlines on their 1985 schedules' : `${B.airlines[BD.airline].name} on its ${YEAR} schedule`, 240, 290, 12, WHITE, 'center');
       text('A Skyarium station', 240, 310, 11, AMBER, 'center');
       toSet({ chime: true });
     } else if (br.kind === 'time') {
@@ -699,7 +705,7 @@
       const part = h24 < 5 ? 'the night flights' : h24 < 12 ? 'the morning push' : h24 < 16 ? 'the afternoon bank' : h24 < 21 ? 'the evening push' : 'the late departures';
       text(nx ? `At ${at}, ${part}` : 'A quiet hour on the board', 240, 160, 24, WHITE, 'center');
       text(nx ? `out of ${city(nx.code)}` : 'Night flights only', 240, 196, 24, WHITE, 'center');
-      if (nx) text(`${nx.n} departures in the hour, as scheduled in 1985`, 240, 236, 12, AMBER, 'center');
+      if (nx) text(`${nx.n} departures in the hour, as scheduled in ${YEAR}`, 240, 236, 12, AMBER, 'center');
       text(`Channel ${CH} · ${BD.name}`, 240, 300, 12, WHITE, 'center');
     } else if (br.kind === 'sponsor') {
       const s = SPONSORS[br.n % SPONSORS.length]; // the channel's sponsors in turn
