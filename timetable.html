@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ghostflights Timetables</title>
+<style>
+  /* The phone's way in: each airline as a 1985 airport departures board, amber on black, from the same schedule
+     engine as the broadcast (feed.js). A prototype. */
+  :root { --black: #0b0b0d; --panel: #141418; --rule: #2a2a30; --amber: #ffbf2e; --white: #f6f2e8; --quiet: #8d887c; --blue: #9fb0ff; }
+  html { background: var(--black); }
+  body { margin: 0 auto; max-width: 560px; color: var(--white); font: 16px/1.3 CG, 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--black); padding: 14px 16px 0; border-bottom: 1px solid var(--rule); }
+  .brand { display: flex; justify-content: space-between; align-items: baseline; }
+  .brand b { color: var(--amber); font-size: 22px; letter-spacing: 0.06em; }
+  .brand a { color: var(--quiet); font-size: 14px; text-decoration: none; margin-left: 14px; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 12px 0; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips button { flex: none; border: 1px solid var(--rule); background: var(--panel); color: var(--white); font: inherit; font-size: 14px;
+    padding: 7px 10px; border-radius: 3px; cursor: pointer; text-transform: uppercase; }
+  .chips button span { color: var(--quiet); margin-right: 5px; }
+  .chips button.on { border-color: var(--amber); color: var(--amber); }
+  .hero { padding: 16px 16px 8px; }
+  .hero h1 { margin: 0; font-size: 30px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .hero .when { color: var(--amber); font-size: 15px; margin-top: 2px; text-transform: uppercase; }
+  .hero img { display: block; width: 100%; margin: 14px 0 4px; }
+  .hero .paint { color: var(--quiet); font-size: 13px; text-transform: uppercase; }
+  h2 { margin: 22px 16px 6px; font-size: 14px; color: var(--amber); letter-spacing: 0.14em; display: flex; justify-content: space-between; }
+  h2 small { color: var(--quiet); font-size: 13px; letter-spacing: 0.04em; }
+  .row { display: grid; grid-template-columns: 76px 1fr auto; gap: 2px 10px; align-items: center; padding: 9px 16px; border-top: 1px solid var(--rule);
+    cursor: pointer; text-transform: uppercase; }
+  .row:nth-child(odd) { background: #101013; }
+  .row img { width: 76px; grid-row: span 2; }
+  .row .route { font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .t { font-size: 18px; color: var(--amber); text-align: right; }
+  .row .sub { font-size: 13px; color: var(--quiet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .st { font-size: 13px; color: var(--blue); text-align: right; white-space: nowrap; }
+  .dep { grid-template-columns: 64px 1fr auto; }
+  .dep .t { text-align: left; }
+  .card { position: fixed; inset: 0; z-index: 5; background: rgba(0, 0, 0, 0.86); display: none; align-items: flex-end; }
+  .card.on { display: flex; }
+  .card > div { width: 100%; max-width: 560px; margin: 0 auto; background: var(--panel); border-top: 2px solid var(--amber); padding: 18px 16px 26px; text-transform: uppercase; }
+  .card img { width: 100%; margin: 8px 0 12px; }
+  .card .big { font-size: 26px; }
+  .card dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 10px 0 0; font-size: 15px; }
+  .card dt { color: var(--quiet); }
+  .card .src { color: var(--quiet); font-size: 12px; margin-top: 14px; text-transform: none; letter-spacing: 0.01em; }
+  footer { color: var(--quiet); font-size: 12px; padding: 26px 16px 40px; line-height: 1.5; letter-spacing: 0.01em; }
+  footer a { color: var(--amber); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>GHOSTFLIGHTS</b><span class="nav"><a href="index.html?tv=1">Watch</a><a href="about.html">About</a><a href="api.html">API</a></span></div>
+  <nav class="chips" id="chips"></nav>
+</header>
+<section class="hero" id="hero"></section>
+<h2>IN THE AIR <small id="airCount"></small></h2>
+<div id="air"></div>
+<h2>NEXT DEPARTURES <small id="depNote"></small></h2>
+<div id="deps"></div>
+<footer>The schedules are real and the flights are simulated. Nobody tracked planes like this in 1985, so each flight is placed along its route by its timetable times. <a href="about.html">About Ghostflights</a> · <a href="api.html">The flights as data</a></footer>
+<div class="card" id="card"><div id="cardBody"></div></div>
+
+<script src="data.js"></script>
+<script src="sprites.js"></script>
+<script src="feed-data.js"></script>
+<script src="feed.js"></script>
+<script>
+(() => {
+  const B = window.BOARD, D = window.GHOSTFLIGHTS_DATA, G = window.Ghostflights, DAY = 86400000;
+  document.fonts.add(new FontFace('CG', `url(${window.CG_FONT})`));
+  const params = new URLSearchParams(location.search);
+  const START = params.get('t') ? Date.parse(params.get('t')) : Date.now(), REAL = Date.now();
+  const now = () => START + (Date.now() - REAL);
+  const channels = Object.entries(B.boards).filter(([c]) => /^\d+$/.test(c));
+  let ch = params.get('ch') && B.boards[params.get('ch')] ? params.get('ch') : '8';
+
+  const city = (code) => B.cities[code] || code;
+  const paint = (type, number) => (type.paints ? type.paints[type.deck[number % type.deck.length]] : type);
+  const sprite = (f) => window.SPRITES[`sprites/${f.sprite}-left.svg`];
+  const clock = (ms, tz) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'UTC' });
+  // A time in a schedule row's own local time: its UTC moment less the row's offset.
+  const localTime = (ms, offset) => clock(ms - offset * 60000);
+
+  const chips = document.getElementById('chips');
+  for (const [c, b] of channels) {
+    const btn = Object.assign(document.createElement('button'), { innerHTML: `<span>${c}</span>${b.name}` });
+    btn.onclick = () => { ch = c; history.replaceState(null, '', `?ch=${c}`); draw(); };
+    chips.append(btn);
+  }
+
+  function draw() {
+    const board = B.boards[ch], code = board.airline, A = D.airlines[code], fleet = B.airlines[code].fleet;
+    const year = A.year || 1985, t = now();
+    for (const b of chips.children) b.classList.toggle('on', b.firstChild.textContent === ch);
+    chips.children[channels.findIndex(([c]) => c === ch)].scrollIntoView({ block: 'nearest', inline: 'center' });
+
+    // The airline, its biggest type in its paint, and today's date in its year.
+    const then = new Date(G.thenIn(Math.floor(t / DAY), year));
+    const date = then.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    const kinds = Object.keys(fleet), star = ['B747', 'DC10', 'L101', 'L15', 'A30B', 'B722'].find((k) => fleet[k]) || kinds[0];
+    document.getElementById('hero').innerHTML = `<h1>${A.name}</h1><div class="when">${date} · ${clock(t, board.tz)}</div>
+      <img src="${sprite(fleet[star].paints ? fleet[star].paints[0] : fleet[star])}" alt=""><div class="paint">${kinds.map((k) => fleet[k].name).join(' · ')}</div>`;
+
+    // In the air: every flight of this airline aloft now, the longest flights first.
+    const air = G.engine(D).airborne(t).filter((f) => f.airline === code).sort((a, b) => b.nm - a.nm);
+    document.getElementById('airCount').textContent = `${air.length} FLIGHTS`;
+    document.getElementById('air').innerHTML = air.map((f, i) => {
+      const fl = paint(fleet[f.kind], f.number);
+      const lands = f.depart + f.block * 60000;
+      const st = f.along < 0.12 ? `CLIMBING ${Math.round(f.alt / 1000)}K` : f.along > 0.85 ? `DESCENDING ${Math.round(f.alt / 1000)}K` : `CRUISING ${Math.round(f.cruise / 1000)}K`;
+      return `<div class="row" data-i="${i}"><img src="${sprite(fl)}" alt="">
+        <div class="route">${city(f.from)} → ${city(f.to)}</div><div class="t">${A.code} ${f.number}</div>
+        <div class="sub">${fl.name} · lands in ${Math.floor((lands - t) / 3600000)}h ${String(Math.round((lands - t) / 60000) % 60).padStart(2, '0')}m</div><div class="st">${st}</div></div>`;
+    }).join('');
+    document.querySelectorAll('#air .row').forEach((el) => { el.onclick = () => card(air[+el.dataset.i], code); });
+
+    // Next departures: the airline's next twenty, at the time each leaves where it leaves.
+    const deps = [];
+    const today = Math.floor(t / DAY);
+    for (const row of A.schedule) {
+      const [num, from, to, leave, offset, block, , , , kind] = row;
+      for (const d of [today - 1, today, today + 1]) {
+        const depart = d * DAY + (offset + leave) * 60000;
+        if (depart >= t && depart < t + 3 * 3600000 && G.flies(row, d, year)) deps.push({ num, from, to, depart, offset, kind });
+      }
+    }
+    deps.sort((a, b) => a.depart - b.depart);
+    document.getElementById('depNote').textContent = 'LOCAL TIMES';
+    document.getElementById('deps').innerHTML = deps.slice(0, 24).map((f) =>
+      `<div class="row dep"><div class="t">${localTime(f.depart, f.offset).replace(' ', '')}</div>
+        <div class="route">${city(f.to)}</div><div class="t" style="text-align:right">${A.code} ${f.num}</div>
+        <div class="sub">from ${city(f.from)}</div><div class="st">${fleet[f.kind] ? fleet[f.kind].name : f.kind}</div></div>`).join('')
+      || '<div class="row dep"><div class="sub">Nothing leaves in the next three hours.</div></div>';
+  }
+
+  // A flight's card: its plane big, where it is, and where its times come from.
+  function card(f, code) {
+    const A = D.airlines[code], fl = paint(B.airlines[code].fleet[f.kind], f.number);
+    const left = Math.max(0, Math.round((f.depart + f.block * 60000 - now()) / 60000));
+    document.getElementById('cardBody').innerHTML = `<div class="big">${A.code} ${f.number} · ${city(f.from)} → ${city(f.to)}</div>
+      <img src="${sprite(fl)}" alt="">
+      <dl><dt>Plane</dt><dd>${fl.name} · ${fl.scheme}</dd>
+      <dt>Now</dt><dd>${f.along < 0.12 ? 'Climbing through' : f.along > 0.85 ? 'Descending through' : 'Cruising at'} ${(f.along < 0.12 || f.along > 0.85 ? f.alt : f.cruise).toLocaleString()} ft</dd>
+      <dt>Distance</dt><dd>${Math.round(f.nm).toLocaleString()} nautical miles · ${Math.floor(left / 60)}h ${left % 60}m to go</dd></dl>
+      <div class="src">Times from: ${A.source}. The position is simulated.</div>`;
+    document.getElementById('card').classList.add('on');
+  }
+  document.getElementById('card').onclick = () => document.getElementById('card').classList.remove('on');
+
+  draw();
+  setInterval(draw, 30000);
+})();
+</script>
+</body>
+</html>

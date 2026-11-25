@@ -113,7 +113,11 @@
   <div class="osd"></div>
 </div>
 <div class="dock"></div>
-<nav class="links"><a class="site" href="about.html">ghostflights.tv</a><a href="about.html">About</a><button class="size" type="button">Bigger picture</button><a href="feed.html">The feed</a><a href="https://skyarium.app">Skyarium</a><a class="ol" href="https://majonesmax.github.io/open-liveries/">Open Liveries</a></nav>
+<nav class="links"><a class="site" href="about.html">ghostflights.tv</a><a href="timetable.html">Timetables</a><a href="about.html">About</a><button class="size" type="button">Bigger picture</button><a href="api.html">API</a><a href="https://skyarium.app">Skyarium</a><a class="ol" href="https://majonesmax.github.io/open-liveries/">Open Liveries</a></nav>
+<script>
+  // A phone opens on the timetables (the set is too small to watch there); ?tv=1 or a channel asks for the set anyway.
+  if (matchMedia('(max-width: 700px)').matches && !/[?&](tv|ch)=/.test(location.search)) location.replace('timetable.html');
+</script>
 <script src="channels.js"></script>
 <script src="music.js"></script>
 <script>

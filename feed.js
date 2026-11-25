@@ -38,10 +38,30 @@
     const a = Math.sin((la2 - la1) * rad / 2) ** 2 + Math.cos(la1 * rad) * Math.cos(la2 * rad) * Math.sin((lo2 - lo1) * rad / 2) ** 2;
     return 12742 * Math.asin(Math.sqrt(a));
   }
-  // Cruise by distance for the jets; the Convair 580, a turboprop with a ceiling near 24,000 feet, flew lower.
-  const cruiseFt = (nm, kind) => (kind === 'CV580'
-    ? (nm < 100 ? 11000 : nm < 200 ? 15000 : 20000)
-    : (nm < 150 ? 17000 : nm < 300 ? 25000 : nm < 700 ? 31000 : 35000));
+  // Cruise level: a band by distance and type, then the hemispheric rule of the day (eastbound odd thousands, westbound
+  // even, and above 29,000 feet only 29, 33, 37 or 41 eastbound and 31, 35 or 39 westbound), the level within the band
+  // picked from the flight's number and route, so a flight always cruises where it did yesterday. The Convair 580, a
+  // turboprop with a ceiling near 24,000 feet, flew lower; the wide-bodies on the longest legs, higher.
+  const HEAVY = new Set(['B747', 'B74S', 'DC10', 'L101', 'L15']);
+  function cruiseFt(nm, kind, east = true, seed = '') {
+    const [lo, hi] = kind === 'CV580' ? (nm < 100 ? [9, 13] : nm < 200 ? [13, 17] : [17, 23])
+      : nm < 150 ? [15, 21] : nm < 300 ? [21, 28] : nm < 700 ? [27, 35]
+      : HEAVY.has(kind) ? (nm < 2500 ? [31, 39] : [33, 39]) : [31, 37];
+    const levels = [];
+    for (let k = lo; k <= hi; k++) {
+      const ok = k < 29 ? (k % 2 === 1) === east : east ? (k - 29) % 4 === 0 : (k - 31) % 4 === 0;
+      if (ok) levels.push(k * 1000);
+    }
+    let h = 0;
+    for (const c of String(seed)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return levels[h % levels.length];
+  }
+  // Whether a route heads east (its first heading 0 to 179 degrees).
+  const eastbound = ([la1, lo1], [la2, lo2]) => {
+    const y = Math.sin((lo2 - lo1) * rad) * Math.cos(la2 * rad);
+    const x = Math.cos(la1 * rad) * Math.sin(la2 * rad) - Math.sin(la1 * rad) * Math.cos(la2 * rad) * Math.cos((lo2 - lo1) * rad);
+    return ((Math.atan2(y, x) / rad) + 360) % 360 < 180;
+  };
   // Altitude along the way: a climb over the first eighth, cruise, a descent over the last sixth.
   const altitude = (cruise, along) => Math.round(Math.min(cruise, cruise * along / 0.12, cruise * (1 - along) / 0.15) / 1000) * 1000;
 
@@ -62,7 +82,7 @@
             const along = (t - depart) / blockMs;
             if (along < 0.04 || along > 0.96 || !flies(row, d, airline.year)) continue;
             const nm = km(pos[from], pos[to]) / 1.852;
-            const cruise = cruiseFt(nm, kind);
+            const cruise = cruiseFt(nm, kind, eastbound(pos[from], pos[to]), `${code}${num}${from}${to}`);
             out.push({ key: `${code}:${num}:${from}-${to}:${d}`, airline: code, number: num, from, to, kind, along, cruise,
               alt: altitude(cruise, along), depart, block, nm, d });
           }
