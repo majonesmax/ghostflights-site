@@ -4,33 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ghostflights API</title>
+<link rel="stylesheet" href="site.css">
 <style>
-  :root { --paper: #f3ecdc; --ink: #241d16; --quiet: #6b6052; --rule: #d6cab2; --navy: #16205a; --amber: #c98a00; --card: #fbf7ee; }
-  @media (prefers-color-scheme: dark) {
-    :root { --paper: #11131f; --ink: #ece4d2; --quiet: #a39a8a; --rule: #2c3045; --navy: #9fb0ff; --amber: #ffbf2e; --card: #181b2b; }
-  }
-  html { background: var(--paper); }
-  body { margin: 0 auto; max-width: 760px; padding: 40px 16px 64px; color: var(--ink); font: 17px/1.55 Georgia, 'Times New Roman', serif; }
-  h1, h2 { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: 0.02em; }
-  h1 { font-size: 34px; margin: 0 0 6px; color: var(--navy); }
-  h2 { font-size: 19px; margin: 36px 0 8px; text-transform: uppercase; letter-spacing: 0.08em; }
-  .lead { font-size: 19px; margin: 0 0 18px; }
-  a { color: var(--navy); }
-  ul { padding-left: 20px; }
-  code, pre { font: 13.5px/1.5 Menlo, Consolas, monospace; }
-  pre { background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 12px 14px; overflow-x: auto; }
-  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 14px; font: 14px/1.3 'Helvetica Neue', Helvetica, Arial, sans-serif; color: var(--quiet); }
-  button { font: 600 14px/1 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 9px 14px; border: 1px solid var(--navy); background: transparent; color: var(--navy); border-radius: 3px; cursor: pointer; }
-  .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--card); }
-  table { border-collapse: collapse; width: 100%; font: 13.5px/1.35 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-  th, td { padding: 6px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--rule); }
-  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--quiet); }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .back { display: inline-block; margin-bottom: 26px; padding: 10px 16px; border: 1px solid var(--navy); border-radius: 3px; font: 600 15px/1 'Helvetica Neue', Helvetica, Arial, sans-serif; text-decoration: none; }
+  /* The API page on the site's look (site.css): only its live table's bits here. */
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 14px; font-size: 14px; color: var(--quiet); }
+  .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); }
+  .page table { font-size: 13.5px; }
+  .page th, .page td { white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
-<a class="back" href="index.html">← Watch the broadcast</a> <a href="timetable.html" style="margin-left: 12px; font: 600 15px/1 'Helvetica Neue', Helvetica, Arial, sans-serif;">Timetables</a> <a href="about.html" style="margin-left: 12px; font: 600 15px/1 'Helvetica Neue', Helvetica, Arial, sans-serif;">About</a>
+<header class="site"><a class="brand" href="index.html">GHOSTFLIGHTS</a>
+  <nav><a href="index.html?tv=1">Watch</a><a href="timetable.html">Timetables</a><a href="about.html">About</a><a href="api.html" aria-current="page">API</a></nav></header>
+<main class="page">
 <h1>Ghostflights API</h1>
 <p class="lead">The flights on Ghostflights as data you can use. Departed airlines fly their real schedules and this is where they are right now.</p>
 
@@ -73,6 +60,7 @@ console.log(globalThis.Ghostflights.feed());</pre>
 </ul>
 <p>Each flight runs on the weekday it flew in its year for today's date. Positions follow the great circle between the two airports. Altitude and speed are estimates from the distance and the scheduled time.</p>
 
+</main>
 <script src="feed-data.js"></script>
 <script src="feed.js"></script>
 <script>

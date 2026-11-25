@@ -1,298 +1,182 @@
-// The station's background music: new wave meets muzak, synthesized in the browser. A soft drum machine, a sequenced
-// synth bass, chorused string pads, chord stabs, an arpeggiated bell and now and then a lead with a dotted echo, over
-// pop progressions. It's generated from the clock, bar by bar from a seed, so it never loops and every viewer hears
-// the same bar at the same moment. Each channel has its own flavor of it (tempo, keys, lead, bass, textures); a
-// change of channel cuts to static until the new picture is in, then that channel's music comes in where it is.
+// The station's background music: a 1984 broadcast music library, four pieces by the same imagined artist on the
+// same album, synthesized in the browser. A Berlin-school pluck sequence (A), an inspirational synth hymn (B), a
+// smooth DX7 weather-segment fusion (C) and a late-night ambient tape loop (D). Each runs a 28-bar arc (intro, build,
+// peak, breakdown, resolve) over a four-chord progression, through a shared delay and a low-pass like a set's coax.
+// It's generated from the clock: every viewer hears the same sixteenth at the same moment. A channel plays one piece
+// (the guide C; the airlines A, B, C, D in turn); a change of channel cuts to static until the new picture is in,
+// then that channel's piece comes in where it is.
 // Muzak.start() after a click (browsers need one before sound); Muzak.stop(); Muzak.tune(ch) when the channel
-// changes and Muzak.tunedIn() when its picture is in; Muzak.now() says what's playing.
+// changes and Muzak.tunedIn() when its picture is in; Muzak.chime() under the station ID; Muzak.now() says what's
+// playing.
 (() => {
-  // Each channel's music: its tempo, where in the run of keys it is, its seed, its lead's wave, its bass pattern (in
-  // semitones over the root, eighths), its bell's brightness and the textures its sections take turns with. The guide
-  // (0) is the gentle one.
-  const FLAVORS = {
-    0: { bpm: 96, keyShift: 2, seed: 0, lead: 'triangle', bass: [0, 7, 12, 7, 0, 7, 12, 7], bell: 2.0, textures: ['arp', 'arp', 'lead'] },
-    1: { bpm: 112, keyShift: 0, seed: 101, lead: 'square', bass: [0, 0, 12, 0, 0, 12, 0, 7], bell: 3.5, textures: ['arp', 'lead', 'stabs'] },
-    2: { bpm: 104, keyShift: 3, seed: 202, lead: 'sawtooth', bass: [0, 12, 0, 12, 0, 12, 0, 12], bell: 3.0, textures: ['lead', 'stabs', 'stabs'] },
-    3: { bpm: 118, keyShift: 1, seed: 303, lead: 'square', bass: [0, 0, 7, 0, 12, 0, 7, 10], bell: 4.0, textures: ['arp', 'arp', 'stabs'] },
-    4: { bpm: 100, keyShift: 4, seed: 404, lead: 'triangle', bass: [0, 0, 0, 12, 0, 0, 7, 12], bell: 2.5, textures: ['lead', 'lead', 'arp'] },
-    5: { bpm: 120, keyShift: 5, seed: 505, lead: 'sawtooth', bass: [0, 12, 7, 12, 0, 12, 7, 5], bell: 3.5, textures: ['stabs', 'arp', 'lead'] },
-    6: { bpm: 108, keyShift: 3, seed: 606, lead: 'square', bass: [0, 7, 0, 12, 0, 7, 10, 12], bell: 3.0, textures: ['arp', 'stabs', 'lead'] },
-    7: { bpm: 116, keyShift: 1, seed: 707, lead: 'sawtooth', bass: [0, 0, 12, 0, 7, 0, 12, 10], bell: 3.5, textures: ['stabs', 'lead', 'arp'] },
-    8: { bpm: 102, keyShift: 4, seed: 808, lead: 'triangle', bass: [0, 12, 7, 12, 0, 12, 7, 12], bell: 2.5, textures: ['arp', 'lead', 'lead'] },
-    9: { bpm: 110, keyShift: 2, seed: 909, lead: 'square', bass: [0, 0, 7, 12, 0, 0, 7, 5], bell: 3.0, textures: ['lead', 'arp', 'stabs'] },
-    10: { bpm: 122, keyShift: 5, seed: 1010, lead: 'square', bass: [0, 12, 0, 7, 0, 12, 0, 10], bell: 4.0, textures: ['stabs', 'arp', 'arp'] },
-    11: { bpm: 98, keyShift: 3, seed: 1111, lead: 'triangle', bass: [0, 7, 12, 7, 0, 7, 10, 7], bell: 2.5, textures: ['arp', 'lead', 'arp'] },
-    12: { bpm: 124, keyShift: 0, seed: 1212, lead: 'sawtooth', bass: [0, 0, 12, 0, 0, 12, 7, 12], bell: 4.0, textures: ['stabs', 'stabs', 'lead'] },
-    13: { bpm: 114, keyShift: 4, seed: 1313, lead: 'square', bass: [0, 12, 7, 0, 0, 12, 7, 10], bell: 3.0, textures: ['lead', 'arp', 'stabs'] },
-    14: { bpm: 106, keyShift: 2, seed: 1414, lead: 'triangle', bass: [0, 0, 7, 12, 0, 0, 5, 7], bell: 3.5, textures: ['arp', 'stabs', 'lead'] },
-  };
-  let F = FLAVORS[1], BEAT = 60 / F.bpm, BAR = BEAT * 4;
-  function flavor(ch) { F = FLAVORS[ch] || FLAVORS[1]; BEAT = 60 / F.bpm; BAR = BEAT * 4; }
-  const NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-  const QUAL = {
-    maj: { name: '', tones: [0, 4, 7] }, add9: { name: 'add9', tones: [0, 4, 7, 14] }, maj7: { name: 'maj7', tones: [0, 4, 7, 11] },
-    min: { name: 'm', tones: [0, 3, 7] }, m7: { name: 'm7', tones: [0, 3, 7, 10] }, sus2: { name: 'sus2', tones: [0, 2, 7] },
-  };
-  // Four-bar progressions, a chord a bar, as [degree in semitones from the key, quality].
-  const PROGS = [
-    [[0, 'add9'], [7, 'maj'], [9, 'm7'], [5, 'maj7']], // I V vi IV
-    [[9, 'm7'], [5, 'maj7'], [0, 'add9'], [7, 'sus2']], // vi IV I V
-    [[0, 'maj7'], [4, 'm7'], [5, 'maj7'], [7, 'maj']], // I iii IV V
-    [[5, 'maj7'], [7, 'maj'], [4, 'm7'], [9, 'm7']], // IV V iii vi
-    [[9, 'min'], [5, 'maj'], [0, 'maj'], [7, 'sus2']], // vi IV I V, the darker way round
-    [[2, 'm7'], [7, 'sus2'], [0, 'add9'], [0, 'maj7']], // ii V I
+  // The arc every piece runs, in bars: which voices play and how open the filter is.
+  const ARC = [
+    { name: 'intro', bars: 4, stems: { drums: 0, bass: 0.4, chords: 1, lead: 0, counter: 0 }, filter: 0.55 },
+    { name: 'build', bars: 8, stems: { drums: 0.7, bass: 0.85, chords: 1, lead: 0.8, counter: 0.4 }, filter: 0.85 },
+    { name: 'peak', bars: 8, stems: { drums: 1, bass: 1, chords: 1, lead: 1, counter: 1 }, filter: 1.15 },
+    { name: 'breakdown', bars: 4, stems: { drums: 0, bass: 0.3, chords: 1, lead: 0.3, counter: 0.85 }, filter: 0.65 },
+    { name: 'resolve', bars: 4, stems: { drums: 0.5, bass: 0.75, chords: 1, lead: 0.65, counter: 0.5 }, filter: 0.8 },
   ];
-  const KEYS = [9, 4, 0, 7, 2, 5]; // A, E, C, G, D, F: a new key every 32 bars
-  const SCALE = [0, 2, 4, 5, 7, 9, 11];
+  const ARC_BARS = ARC.reduce((s, a) => s + a.bars, 0);
 
-  function rng(seed) {
-    let a = seed >>> 0;
-    return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  }
-  const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
-
-  // What bar n plays: its key, chord, the section's texture and the seed for its details. Sections are eight bars;
-  // every fourth one is a breakdown (no drums, pads and bells), and the textures in between take turns.
-  function barAt(n) {
-    const section = Math.floor(n / 8);
-    const key = KEYS[(Math.floor(n / 32) + F.keyShift) % KEYS.length];
-    const r = rng(section * 7919 + 13 + F.seed);
-    const half = Math.floor((n % 8) / 4);
-    const prog = PROGS[Math.floor(r() * PROGS.length + half * 2) % PROGS.length];
-    const [deg, q] = prog[n % 4];
-    const root = (key + deg) % 12;
-    const texture = section % 4 === 3 ? 'breakdown' : F.textures[Math.floor(r() * F.textures.length)];
-    return { n, key, root, q: QUAL[q], name: `${NAMES[root]}${QUAL[q].name}`, texture, fill: n % 8 === 7, r: rng(n * 104729 + 7 + F.seed) };
-  }
-
-  let ctx = null, timer = null, out = null, noise = null, buses = null, t0 = 0, wall0 = 0, nextBar = 0, last = null;
-  // The channel's own mix (faded out when the channel changes), whether it's waiting for the picture, nothing earlier
-  // than this plays (when a channel comes in mid-bar), and the static between channels.
-  let bed = null, waiting = false, cutoff = 0, staticSrc = null;
-  let padVoicing = [57, 60, 64, 69], leadNote = 76;
-
-  function setup(given) {
-    ctx = given || new (window.AudioContext || window.webkitAudioContext)();
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -16; comp.ratio.value = 3; comp.attack.value = 0.01;
-    const top = ctx.createBiquadFilter(); top.type = 'lowpass'; top.frequency.value = 11000;
-    out = ctx.createGain(); out.gain.value = 1.0;
-    out.connect(top).connect(comp).connect(ctx.destination);
-    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-    const nd = noise.getChannelData(0);
-    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-  }
-
-  const lfo = (hz, depth, param) => {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.value = hz; g.gain.value = depth; o.connect(g).connect(param); o.start();
+  // The four pieces: tempo, delay, filter, four chords (a bass root and four voices, in Hz) two bars each, the lead's
+  // pattern (a voice of the chord per sixteenth, -1 a rest) and the counter-melody.
+  const SCORES = {
+    A: { name: 'Berlin Express', bpm: 114, delay: 0.394, feedback: 0.48, cutoff: 1450, style: 'berlin',
+      chords: [[87.31, [174.61, 220.0, 261.63, 329.63]], [73.42, [146.83, 174.61, 220.0, 261.63]],
+        [116.54, [174.61, 233.08, 293.66, 349.23]], [130.81, [196.0, 261.63, 349.23, 392.0]]],
+      lead: [0, 2, 3, 1, 3, 2, 0, 1, 2, 3, 1, 2, 0, 3, 2, 1],
+      counter: [659.25, 587.33, 523.25, 440.0, 523.25, 587.33, 659.25, 783.99] },
+    B: { name: 'Olympic Horizon', bpm: 102, delay: 0.441, feedback: 0.42, cutoff: 1650, style: 'hymn',
+      chords: [[65.41, [130.81, 196.0, 261.63, 329.63]], [65.41, [130.81, 174.61, 261.63, 349.23]],
+        [61.74, [123.47, 196.0, 246.94, 392.0]], [65.41, [130.81, 196.0, 261.63, 329.63]]],
+      lead: [0, 1, 2, 3, 2, 1, 0, 1, 0, 1, 2, 3, 2, 1, 2, 3],
+      counter: [523.25, 587.33, 659.25, 587.33, 523.25, 493.88, 523.25, 392.0] },
+    C: { name: 'Local on the 8s', bpm: 92, delay: 0.489, feedback: 0.35, cutoff: 1300, style: 'fusion',
+      chords: [[65.41, [164.81, 196.0, 246.94, 293.66]], [55.0, [130.81, 164.81, 196.0, 246.94]],
+        [73.42, [146.83, 174.61, 220.0, 261.63]], [98.0, [174.61, 220.0, 246.94, 329.63]]],
+      lead: [0, -1, 2, 3, -1, 1, 2, -1, 3, 2, 1, -1, 2, 0, -1, 1],
+      counter: [587.33, 659.25, 783.99, 659.25, 587.33, 523.25, 493.88, 587.33] },
+    D: { name: 'Night Terminal', bpm: 68, delay: 0.661, feedback: 0.56, cutoff: 1050, style: 'ambient',
+      chords: [[51.91, [155.56, 207.65, 261.63, 311.13]], [43.65, [130.81, 174.61, 207.65, 261.63]],
+        [69.3, [138.59, 174.61, 207.65, 261.63]], [77.78, [155.56, 207.65, 233.08, 311.13]]],
+      lead: [0, -1, -1, 2, -1, -1, 3, -1, 1, -1, -1, 2, -1, -1, 0, -1],
+      counter: [622.25, 523.25, 466.16, 415.3, 466.16, 523.25, 622.25, 830.61] },
   };
-  function impulse(seconds, shape) {
-    const len = Math.floor(ctx.sampleRate * seconds), ir = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * shape(i / len); }
-    return ir;
+  // The guide is the weather-segment piece; the airline channels take the four in turn.
+  const scoreFor = (ch) => (ch === '0' ? 'C' : 'ABCD'[(Math.max(1, +ch || 1) - 1) % 4]);
+
+  const VOLUME = 0.28, AHEAD = 1.5; // seconds scheduled ahead (a background tab ticks once a second)
+  let ctx = null, out = null, master = null, coax = null, delay = null, feedback = null, noise = null;
+  let bed = null; // this channel's voices: its own gain into the coax and the delay, faded out on a change
+  let score = SCORES.A, scoreId = 'A', timer = null, waiting = true, next = 0, t0 = 0, wall0 = 0, last = null;
+
+  const stepSec = () => 60 / score.bpm / 4;
+  // Where a step falls in the piece: its bar, the step in the bar, the arc's section and the chord.
+  function state(n) {
+    const bar = Math.floor(n / 16), arcBar = ((bar % ARC_BARS) + ARC_BARS) % ARC_BARS;
+    let acc = 0, section = ARC[0];
+    for (const s of ARC) { if (arcBar < acc + s.bars) { section = s; break; } acc += s.bars; }
+    const [root, notes] = score.chords[((Math.floor(bar / 2) % 4) + 4) % 4];
+    return { bar, s: ((n % 16) + 16) % 16, section, root, notes };
   }
-  // The buses: a hall for the pads and bells, the gated room for the snare, a dotted-eighth echo, a chorus for pads.
-  function makeBuses(dest) {
-    const hall = ctx.createConvolver(); hall.buffer = impulse(2.6, (x) => (1 - x) ** 3);
-    const hallOut = ctx.createGain(); hallOut.gain.value = 0.28; hall.connect(hallOut).connect(dest);
-    const gate = ctx.createConvolver(); gate.buffer = impulse(0.32, (x) => (x < 0.85 ? 0.9 - 0.3 * x : 0)); // the 80s gated snare
-    const gateOut = ctx.createGain(); gateOut.gain.value = 0.5; gate.connect(gateOut).connect(dest);
-    const echo = ctx.createDelay(2), fb = ctx.createGain(), tone = ctx.createBiquadFilter(), echoOut = ctx.createGain();
-    echo.delayTime.value = BEAT * 0.75; fb.gain.value = 0.38; tone.type = 'lowpass'; tone.frequency.value = 3200; echoOut.gain.value = 0.3;
-    echo.connect(tone).connect(fb).connect(echo); tone.connect(echoOut).connect(dest);
-    const chorusIn = ctx.createGain(), pan = ctx.createStereoPanner(), cd = ctx.createDelay(0.05), cg = ctx.createGain();
-    cd.delayTime.value = 0.012; lfo(0.6, 0.004, cd.delayTime); lfo(0.25, 0.5, pan.pan); cg.gain.value = 0.6;
-    chorusIn.connect(pan); chorusIn.connect(cd).connect(cg).connect(pan); pan.connect(dest);
-    const send = (dest, amounts) => { const g = ctx.createGain(); g.connect(dest); for (const [bus, a] of amounts) { const s = ctx.createGain(); s.gain.value = a; g.connect(s).connect(bus); } return g; };
-    return {
-      drums: send(dest, [[hall, 0.05]]), snare: send(dest, [[gate, 0.9]]), bass: send(dest, []),
-      pad: send(chorusIn, [[hall, 0.5]]), stab: send(chorusIn, [[hall, 0.25], [echo, 0.2]]),
-      bell: send(dest, [[hall, 0.4], [echo, 0.45]]), lead: send(dest, [[hall, 0.3], [echo, 0.55]]),
-    };
+  // A small hash for the pads' chorus drift, the same for every viewer.
+  const drift = (n, i) => ((Math.sin(n * 12.9898 + i * 78.233) * 43758.5453) % 1) * 14 - 7;
+
+  function setup(context = new (window.AudioContext || window.webkitAudioContext)()) {
+    ctx = context;
+    out = ctx.createGain(); out.connect(ctx.destination); // the chime and the static
+    master = ctx.createGain(); master.gain.value = VOLUME; master.connect(out);
+    coax = ctx.createBiquadFilter(); coax.type = 'lowpass'; coax.frequency.value = 3400; coax.connect(master);
+    delay = ctx.createDelay(2); feedback = ctx.createGain();
+    delay.connect(feedback); feedback.connect(delay); delay.connect(coax);
+    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  // A fresh bed for the channel's piece, its delay set to the piece's.
+  function newBed() {
+    const g = ctx.createGain(), send = ctx.createGain();
+    g.connect(coax); send.connect(delay);
+    delay.delayTime.setTargetAtTime(score.delay, ctx.currentTime, 0.08);
+    feedback.gain.setTargetAtTime(score.feedback, ctx.currentTime, 0.08);
+    return { g, send };
   }
 
-  function env(g, t, peak, hold, decay, end, release, attack = 0.005) {
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(peak, t + attack);
-    g.gain.setTargetAtTime(hold, t + attack + 0.002, decay);
-    g.gain.setTargetAtTime(0.0001, end, release);
-  }
-
-  // A sequenced bass: a sawtooth and a sine an octave down, through a resonant filter that snaps shut on each note.
-  function bass(t, m, d, v) {
-    if (t < cutoff) return;
-    const f = mtof(m), o = ctx.createOscillator(), sub = ctx.createOscillator(), sg = ctx.createGain(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
-    o.type = 'sawtooth'; o.frequency.value = f; sub.frequency.value = f / 2; sg.gain.value = 0.6;
-    lp.type = 'lowpass'; lp.Q.value = 7;
-    lp.frequency.setValueAtTime(300 + 1500 * v, t); lp.frequency.setTargetAtTime(260, t, 0.07);
-    env(g, t, 0.22 * v, 0.14 * v, 0.2, t + d, 0.04);
-    o.connect(lp); sub.connect(sg).connect(lp); lp.connect(g).connect(buses.bass);
-    for (const x of [o, sub]) { x.start(t); x.stop(t + d + 0.3); }
-  }
-  // String pads: two detuned saws a voice, a slow filter, through the chorus.
-  function pad(t, ms, d, level = 1) {
-    if (t < cutoff) { d -= cutoff - t; t = cutoff; if (d < 0.2) return; }
-    const lp = ctx.createBiquadFilter(), g = ctx.createGain();
-    lp.type = 'lowpass'; lp.Q.value = 0.4;
-    lp.frequency.setValueAtTime(900, t); lp.frequency.linearRampToValueAtTime(2000, t + d * 0.6);
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.016 * level, t + 0.35); g.gain.setTargetAtTime(0.0001, t + d, 0.25);
-    lp.connect(g).connect(buses.pad);
-    for (const m of ms) for (const cents of [-11, 9]) {
-      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = cents;
-      o.connect(lp); o.start(t); o.stop(t + d + 1.5);
-    }
-  }
-  // A chord stab: bright saws whose filter falls fast.
-  function stab(t, ms, v) {
-    if (t < cutoff) return;
-    const lp = ctx.createBiquadFilter(), g = ctx.createGain();
-    lp.type = 'lowpass'; lp.Q.value = 2; lp.frequency.setValueAtTime(4200, t); lp.frequency.setTargetAtTime(700, t, 0.06);
-    env(g, t, 0.03 * v, 0.008 * v, 0.08, t + 0.18, 0.06, 0.003);
-    lp.connect(g).connect(buses.stab);
-    for (const m of ms) for (const cents of [-6, 6]) {
-      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = cents;
-      o.connect(lp); o.start(t); o.stop(t + 0.5);
-    }
-  }
-  // A bell: two-operator FM, the modulator at 3.5 times the pitch, its depth dying away (a DX7's glassy tine).
-  function bell(dest, t, m, d, v) {
-    if (t < cutoff) return;
-    const f = mtof(m), car = ctx.createOscillator(), mod = ctx.createOscillator(), depth = ctx.createGain(), g = ctx.createGain();
-    car.frequency.value = f; mod.frequency.value = f * F.bell;
-    depth.gain.setValueAtTime(f * 2.2 * v, t); depth.gain.setTargetAtTime(f * 0.15, t, 0.18);
-    mod.connect(depth).connect(car.frequency);
-    env(g, t, 0.05 * v, 0.0001, 0.45, t + d, 0.2, 0.002);
-    car.connect(g).connect(dest);
-    for (const o of [car, mod]) { o.start(t); o.stop(t + d + 1.5); }
-  }
-  // The lead: a square wave, softened, gliding up or down from the note before, vibrato coming in late.
-  function lead(t, m, from, d, v) {
-    if (t < cutoff) return;
+  // The voices.
+  function pluck(f, t, dur, amp, type, cutoff, echo = false) {
     const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
-    o.type = F.lead;
-    o.frequency.setValueAtTime(mtof(from), t); o.frequency.exponentialRampToValueAtTime(mtof(m), t + 0.06);
-    const vib = ctx.createOscillator(), vg = ctx.createGain();
-    vib.frequency.value = 5.5; vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(12, t + Math.min(d, 0.5));
-    vib.connect(vg).connect(o.detune);
-    lp.type = 'lowpass'; lp.frequency.value = 2400; lp.Q.value = 1;
-    env(g, t, 0.035 * v, 0.028 * v, 0.2, t + d, 0.07, 0.015);
-    o.connect(lp).connect(g).connect(buses.lead);
-    for (const x of [o, vib]) { x.start(t); x.stop(t + d + 0.4); }
+    o.type = type;
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 1.012, t + 0.015); // a marimba's attack
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.04);
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(cutoff, t);
+    lp.frequency.exponentialRampToValueAtTime(240, t + dur);
+    g.gain.setValueAtTime(0.0008, t);
+    g.gain.linearRampToValueAtTime(amp, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    o.connect(lp).connect(g).connect(bed.g);
+    if (echo) g.connect(bed.send);
+    o.start(t); o.stop(t + dur + 0.05);
   }
-
-  // The drum machine, kept low as muzak keeps it.
-  function kick(t, v) {
-    if (t < cutoff) return;
+  function pad(n, notes, t, dur, amp, cutoff) {
+    notes.forEach((f, i) => {
+      const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(f, t); o.detune.value = drift(n, i);
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(cutoff * 0.6, t);
+      lp.frequency.linearRampToValueAtTime(cutoff, t + dur * 0.5);
+      lp.frequency.linearRampToValueAtTime(cutoff * 0.6, t + dur);
+      g.gain.setValueAtTime(0.0008, t);
+      g.gain.linearRampToValueAtTime(amp, t + 0.8);
+      g.gain.setValueAtTime(amp, t + dur - 0.9);
+      g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+      o.connect(lp).connect(g).connect(bed.g);
+      o.start(t); o.stop(t + dur + 0.05);
+    });
+  }
+  function drum(t, amp, type, from, to, fall, len, attack = 0) {
     const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.11);
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.42 * v, t + 0.004); g.gain.setTargetAtTime(0.0001, t + 0.01, 0.09);
-    o.connect(g).connect(buses.drums); o.start(t); o.stop(t + 0.5);
+    o.type = type;
+    o.frequency.setValueAtTime(from, t);
+    o.frequency.exponentialRampToValueAtTime(to, t + fall);
+    if (attack) { g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(amp, t + attack); } else g.gain.setValueAtTime(amp, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + len);
+    o.connect(g).connect(bed.g);
+    o.start(t); o.stop(t + len + 0.05);
   }
-  function hiss(dest, t, type, freq, q, gain, len, attack = 0.001) {
-    if (t < cutoff) return;
-    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-    src.buffer = noise; f.type = type; f.frequency.value = freq; f.Q.value = q;
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + attack); g.gain.setTargetAtTime(0.0001, t + attack, len / 3);
-    src.connect(f).connect(g).connect(dest);
-    src.start(t, Math.random() * 0.5); src.stop(t + len + 0.1);
-  }
-  function snare(t, v) {
-    if (t < cutoff) return;
-    hiss(buses.snare, t, 'bandpass', 1900, 0.8, 0.14 * v, 0.14);
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = 'triangle'; o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(170, t + 0.05);
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.1 * v, t + 0.002); g.gain.setTargetAtTime(0.0001, t + 0.004, 0.03);
-    o.connect(g).connect(buses.snare); o.start(t); o.stop(t + 0.2);
-    // A clap layered on: three quick bursts.
-    for (const k of [0, 0.011, 0.022]) hiss(buses.snare, t + k, 'bandpass', 1300, 1.2, 0.05 * v, 0.03);
-  }
-  const hat = (t, v, open) => hiss(buses.drums, t, 'highpass', 8000, 0.7, (open ? 0.03 : 0.022) * v, open ? 0.22 : 0.035);
+  const tympani = (t, amp) => drum(t, amp, 'sine', 98, 48, 0.35, 0.55, 0.02);
+  const kick = (t, amp) => drum(t, amp, 'sine', 115, 42, 0.14, 0.22);
+  const rimshot = (t, amp) => drum(t, amp, 'triangle', 420, 160, 0.04, 0.06);
 
-  // The voicing nearest the last one: each tone in the octave closest to where the hand already is.
-  function voice(b, around) {
-    const center = around.reduce((s, m) => s + m, 0) / around.length;
-    return b.q.tones.map((iv) => {
-      const pc = (b.root + iv) % 12;
-      let m = 48 + pc;
-      while (m + 12 <= center + 6) m += 12;
-      return Math.abs(m + 12 - center) < Math.abs(m - center) ? m + 12 : m;
-    }).sort((a, c) => a - c);
-  }
-
-  function play(b, t) {
-    if (!buses) { bed = ctx.createGain(); bed.connect(out); buses = makeBuses(bed); }
-    const r = b.r, S = BEAT / 4; // a sixteenth
-    const touch = (v) => v * (0.85 + 0.3 * r());
-    const down = b.texture === 'breakdown';
-    padVoicing = voice(b, padVoicing);
-    pad(t, padVoicing, BAR, down ? 1.4 : 1);
-
-    // The bass: eighths, the root with octave jumps (the new wave pulse); held long notes in a breakdown.
-    const root = 33 + ((b.root + 3) % 12); // between A1 and G#2
-    if (down) bass(t, root, BAR * 0.95, 0.5);
-    else {
-      F.bass.forEach((s, i) => bass(t + i * BEAT / 2, root + s, BEAT / 2 * 0.8, touch(i % 2 ? 0.7 : 1)));
+  // One sixteenth of the piece, step n of the clock, at audio time t.
+  function play(n, t) {
+    const S = stepSec(), { bar, s, section, root, notes } = state(n), st = section.stems, cutoff = score.cutoff * section.filter;
+    if (st.drums > 0) {
+      if (score.style === 'hymn' && (s === 0 || s === 8)) tympani(t, 0.14 * st.drums);
+      if (score.style === 'fusion') {
+        if (s === 0 || s === 10) kick(t, 0.12 * st.drums);
+        if (s === 4 || s === 12) rimshot(t, 0.06 * st.drums);
+      }
     }
-
-    if (!down) {
-      // Drums: kick on one and three (and sometimes the and of three), the gated snare and clap on two and four,
-      // closed hats on the eighths with a sixteenth now and then, an open hat into the next bar; a fill to end a section.
-      kick(t, 1); kick(t + 2 * BEAT, 0.9);
-      if (r() < 0.35) kick(t + 2.5 * BEAT, 0.6);
-      snare(t + BEAT, 1); snare(t + 3 * BEAT, 1);
-      for (let i = 0; i < 8; i++) hat(t + i * BEAT / 2, i % 2 ? 0.7 : 1, false);
-      for (let i = 0; i < 16; i++) if (i % 2 && r() < 0.25) hat(t + i * S, 0.45, false);
-      if (r() < 0.5) hat(t + 3.5 * BEAT, 1, true);
-      if (b.fill) for (const k of [13, 14, 15]) snare(t + k * S, 0.45 + k * 0.03);
+    if (st.bass > 0) {
+      if (score.style === 'fusion') {
+        if (s === 0 || s === 6 || s === 10) pluck(s === 6 ? root * 1.5 : root, t, 0.45, 0.18 * st.bass, 'triangle', 420);
+      } else if (s === 0 || (score.style === 'hymn' && s === 8)) pluck(root, t, S * 7, 0.16 * st.bass, 'sine', 340);
     }
-
-    const chord = padVoicing.map((m) => m + 12);
-    if (b.texture === 'stabs') {
-      // Chord stabs on the offbeats, the and of two and of four.
-      for (const at of [1.5, 3.5]) stab(t + at * BEAT, chord.slice(0, 3), touch(1));
-      if (r() < 0.4) stab(t + 2.75 * BEAT, chord.slice(0, 3), 0.6);
+    if (st.chords > 0 && s === 0 && bar % 2 === 0) pad(bar, notes, t, S * 30, 0.055 * st.chords, cutoff * 0.75);
+    if (st.lead > 0) {
+      const v = score.lead[s];
+      if (v !== -1 && notes[v]) {
+        const octave = score.style === 'berlin' && s % 7 === 3 ? 2 : 1;
+        pluck(notes[v] * octave, t, score.style === 'ambient' ? 1.4 : 0.36, 0.14 * st.lead, score.style === 'berlin' ? 'triangle' : 'sine', cutoff, true);
+      }
     }
-    if (b.texture === 'arp' || down) {
-      // The bell, arpeggiating the chord in sixteenths (eighths in a breakdown), up and back down.
-      const tones = chord.concat(chord[0] + 12);
-      const order = tones.concat(tones.slice(1, -1).reverse());
-      const step = down ? BEAT / 2 : S;
-      for (let i = 0; i * step < BAR - 0.01; i++) bell(buses.bell, t + i * step, order[i % order.length], step * 1.5, touch(down ? 0.8 : 0.55));
+    if (st.counter > 0 && s % 4 === 0) {
+      const f = score.counter[(((bar * 4 + s / 4) % score.counter.length) + score.counter.length) % score.counter.length];
+      pluck(f, t, S * 3.6, 0.09 * st.counter, 'sine', cutoff * 1.1, true);
     }
-    if (b.texture === 'lead' && r() < 0.85) {
-      // The lead in phrases with room between: chord tones on the beat, the scale between, mostly steps.
-      const shapes = [[0, 1, 1.5, 2, 3], [0.5, 1, 2, 2.5], [0, 1.5, 2, 3, 3.5], [1, 1.5, 2.5, 3]];
-      const shape = shapes[Math.floor(r() * shapes.length)];
-      const chordPcs = b.q.tones.map((iv) => (b.root + iv) % 12);
-      const scalePcs = SCALE.map((s) => (b.key + s) % 12);
-      shape.forEach((beat, i) => {
-        const pcs = beat % 1 === 0 ? chordPcs : scalePcs;
-        const cands = [];
-        for (let m = 69; m <= 84; m++) if (pcs.includes(m % 12)) cands.push(m);
-        cands.sort((a, c) => Math.abs(a - leadNote) - Math.abs(c - leadNote));
-        const from = leadNote;
-        leadNote = cands[Math.min(cands.length - 1, Math.floor(r() * 3))];
-        const len = (shape[i + 1] ?? 4) - beat;
-        lead(t + beat * BEAT, leadNote, from, Math.min(len, 1.5) * BEAT * 0.9, touch(1));
-      });
-    }
+    last = { n, bar, section: section.name };
   }
 
+  // Schedule every step from the next one up to AHEAD seconds out. Step n starts at wall-clock time n · step: the
+  // audio clock was lined up with the wall clock once, at start.
+  const at = (n) => t0 + n * stepSec() - wall0;
   function tick() {
-    if (waiting) return;
-    while (t0 + nextBar * BAR - wall0 < ctx.currentTime + 0.6) {
-      const at = t0 + nextBar * BAR - wall0;
-      if (at + BAR > ctx.currentTime) { last = barAt(nextBar); play(last, at); } // a bar already begun plays from the cutoff
-      nextBar++;
+    if (waiting || !bed) return;
+    while (at(next) < ctx.currentTime + AHEAD) {
+      if (at(next) >= ctx.currentTime) play(next, at(next));
+      next++;
     }
   }
-  // Come in on the channel's music where it is now: from this bar, nothing before this moment.
+  // Come in on the channel's piece where it is now: from the next step, nothing before this moment.
   function joinNow() {
-    cutoff = ctx.currentTime + 0.05;
-    nextBar = Math.floor((wall0 + ctx.currentTime - t0) / BAR);
+    bed = newBed();
+    next = Math.ceil((wall0 + ctx.currentTime + 0.03 - t0) / stepSec());
     tick();
   }
+  let staticSrc = null;
   // Static: noise, a little band-limited, as long as the snow lasts.
   function staticOn() {
     if (staticSrc) return;
@@ -307,24 +191,29 @@
     const { src, g } = staticSrc; staticSrc = null;
     g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.04); src.stop(ctx.currentTime + 0.3);
   }
+  function choose(ch) { scoreId = scoreFor(String(ch)); score = SCORES[scoreId]; }
 
   window.Muzak = {
     start() {
       if (ctx) { ctx.resume(); return; }
       setup();
-      // Bar n starts at wall-clock time n * BAR: the audio clock is lined up with the wall clock once, here.
       t0 = ctx.currentTime; wall0 = Date.now() / 1000;
       waiting = false;
       joinNow();
       timer = setInterval(tick, 100);
     },
-    stop() { clearInterval(timer); timer = null; if (ctx) ctx.close(); ctx = null; buses = null; bed = null; staticSrc = null; },
-    // The channel changes: the music cuts out and static plays until the new picture is in (tunedIn).
+    stop() { clearInterval(timer); timer = null; if (ctx) ctx.close(); ctx = null; bed = null; staticSrc = null; },
+    // The channel changes: the music cuts out (the steps already scheduled fade with their bed) and static plays
+    // until the new picture is in (tunedIn).
     tune(ch) {
-      flavor(ch);
+      choose(ch);
       if (!ctx) return;
-      if (bed) { const old = bed; old.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.03); setTimeout(() => old.disconnect(), 1500); }
-      bed = null; buses = null; waiting = true;
+      if (bed) {
+        const old = bed;
+        old.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.03); old.send.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.03);
+        setTimeout(() => { old.g.disconnect(); old.send.disconnect(); }, (AHEAD + 1) * 1000);
+      }
+      bed = null; waiting = true;
       staticOn();
     },
     tunedIn() {
@@ -333,25 +222,31 @@
       waiting = false;
       joinNow();
     },
-    // The station's chime under its ID: a rising bell arpeggio, our own (not a network's three notes).
+    // The station's chime under its ID: four rising bells, on top of the music.
     chime() {
-      if (!ctx || !buses) return;
-      const at = ctx.currentTime + 0.05;
-      [[69, 0], [73, 0.24], [76, 0.48], [81, 0.72], [85, 0.72]].forEach(([m, d]) => bell(buses.bell, at + d, m, 1.8, 1));
+      if (!ctx) return;
+      const now = ctx.currentTime + 0.05;
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+        const t = now + i * 0.14, o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.14, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.9);
+        o.connect(g).connect(out); o.start(t); o.stop(t + 0.95);
+      });
     },
     playing: () => !!timer,
     // Whether the browser is holding the sound until the viewer's next key or click (after a channel change).
     held: () => !!ctx && ctx.state !== 'running',
-    // The same music rendered offline, faster than real time, from bar n on (for listening tests and checks).
-    render(seconds, n = Math.ceil(Date.now() / 1000 / BAR), rate = 32000, ch = null) {
-      if (ch !== null) flavor(String(ch));
+    // The same music rendered offline, faster than real time, from wall-clock second `from` on (for listening tests).
+    render(seconds, from = Date.now() / 1000, rate = 32000, ch = null) {
+      if (ch !== null) choose(ch);
       setup(new OfflineAudioContext(2, Math.ceil(seconds * rate), rate));
-      buses = null; cutoff = 0;
-      for (let k = 0; k * BAR < seconds; k++) { last = barAt(n + k); play(last, k * BAR + 0.05); }
+      t0 = 0.05; wall0 = from; bed = newBed();
+      const first = Math.ceil(from / stepSec());
+      for (let n = first; at(n) < seconds; n++) play(n, at(n));
       const done = ctx.startRendering();
-      ctx = null; buses = null; bed = null;
+      ctx = null; bed = null;
       return done;
     },
-    now: () => last && { key: NAMES[last.key], chord: last.name, bar: last.n, texture: last.texture },
+    now: () => last && { piece: score.name, score: scoreId, bar: last.bar % ARC_BARS + 1, of: ARC_BARS, section: last.section },
   };
 })();

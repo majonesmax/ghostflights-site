@@ -4,27 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>About Ghostflights</title>
-<style>
-  :root { --paper: #f3ecdc; --ink: #241d16; --quiet: #6b6052; --rule: #d6cab2; --navy: #16205a; --card: #fbf7ee; }
-  @media (prefers-color-scheme: dark) {
-    :root { --paper: #11131f; --ink: #ece4d2; --quiet: #a39a8a; --rule: #2c3045; --navy: #9fb0ff; --card: #181b2b; }
-  }
-  html { background: var(--paper); }
-  body { margin: 0 auto; max-width: 720px; padding: 40px 16px 64px; color: var(--ink); font: 18px/1.6 Georgia, 'Times New Roman', serif; }
-  h1, h2 { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: 0.02em; }
-  h1 { font-size: 34px; margin: 0 0 8px; color: var(--navy); }
-  h2 { font-size: 18px; margin: 36px 0 8px; text-transform: uppercase; letter-spacing: 0.08em; }
-  .lead { font-size: 20px; margin: 0 0 8px; }
-  a { color: var(--navy); }
-  ul { padding-left: 20px; }
-  li { margin: 4px 0; }
-  .back { display: inline-block; margin-bottom: 26px; padding: 10px 16px; border: 1px solid var(--navy); border-radius: 3px;
-    font: 600 15px/1 'Helvetica Neue', Helvetica, Arial, sans-serif; text-decoration: none; }
-  .fine { color: var(--quiet); font-size: 15px; }
-</style>
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
-<a class="back" href="index.html">← Watch the broadcast</a>
+<header class="site"><a class="brand" href="index.html">GHOSTFLIGHTS</a>
+  <nav><a href="index.html?tv=1">Watch</a><a href="timetable.html">Timetables</a><a href="about.html" aria-current="page">About</a><a href="api.html">API</a></nav></header>
+<main class="page">
 <h1>About Ghostflights</h1>
 <p class="lead">Ghostflights is a TV station from 1985 that shows airlines that don't exist anymore. They fly their real schedules on painted route maps all day long.</p>
 <p>Whatever time it is where you are, it's that time on today's date in 1985. If Northwest Orient had a flight leaving Minneapolis for Tokyo at this hour on this day back then, you'll see it take off now and cross the map at its real pace. It lands when it landed.</p>
@@ -84,5 +69,6 @@
   <li>Lettering in <a href="https://github.com/jpt/barlow">Barlow Condensed</a> by Jeremy Tribby, under the <a href="licenses/Barlow-OFL.txt">SIL Open Font License</a>.</li>
 </ul>
 <p class="fine">Airline names and marks belong to their owners. Ghostflights isn't connected with any airline.</p>
+</main>
 </body>
 </html>

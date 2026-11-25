@@ -64,8 +64,10 @@
     transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1); }
   .cabinet .caption, .dock .caption { margin-top: 0.1em; font: 700 0.4em/1 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: 0.16em; color: #e9dcc4; }
   /* A line of links on the land under the set. */
-  .links { position: fixed; left: 0; right: 0; bottom: 14px; text-align: center; font: 500 13px/1.4 -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #f3ede4cc; }
-  .links a { color: #f7c98b; text-decoration: none; margin: 0 8px; }
+  /* The site's nav in the station's lettering (site.css's face), under the set. */
+  @font-face { font-family: CG; src: url(fonts/cg.ttf) format('truetype'); font-display: swap; }
+  .links { position: fixed; left: 0; right: 0; bottom: 14px; text-align: center; font: 16px/1.4 CG, 'Arial Narrow', sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #f3ede4cc; }
+  .links a { color: #ffbf2e; text-decoration: none; margin: 0 8px; }
   .links .site { color: #f3ede4cc; }
   .links a:hover { text-decoration: underline; }
   /* The bigger picture: the screen fills the window, the cabinet fades and the knobs move to a small plaque. */
@@ -76,7 +78,7 @@
     box-shadow: 0 0.6em 1.5em rgba(10, 6, 20, 0.55), inset 0 0.08em 0 rgba(255, 230, 200, 0.25); }
   body.big .dock { display: flex; }
   .dock .control { margin-left: 0; font-size: calc(1em * var(--k, 1)); }
-  .links button { font: inherit; color: #f7c98b; background: none; border: 0; padding: 0; margin: 0 8px; cursor: pointer; }
+  .links button { font: inherit; letter-spacing: inherit; text-transform: inherit; color: #ffbf2e; background: none; border: 0; padding: 0; margin: 0 8px; cursor: pointer; }
   .links button:hover { text-decoration: underline; }
   @media (max-width: 520px) { .links { font-size: 12px; } .links .site, .links .ol { display: none; } .links a, .links button { margin: 0 6px; } }
   /* The set: the station's picture (station.html) inside it, and what the set itself draws over it. Changing channel
@@ -113,7 +115,7 @@
   <div class="osd"></div>
 </div>
 <div class="dock"></div>
-<nav class="links"><a class="site" href="about.html">ghostflights.tv</a><a href="timetable.html">Timetables</a><a href="about.html">About</a><button class="size" type="button">Bigger picture</button><a href="api.html">API</a><a href="https://skyarium.app">Skyarium</a><a class="ol" href="https://majonesmax.github.io/open-liveries/">Open Liveries</a></nav>
+<nav class="links"><a class="site" href="about.html">ghostflights.tv</a><a href="timetable.html">Timetables</a><a href="about.html">About</a><a href="api.html">API</a><button class="size" type="button">Bigger picture</button><a href="https://skyarium.app">Skyarium</a><a class="ol" href="https://majonesmax.github.io/open-liveries/">Open Liveries</a></nav>
 <script>
   // A phone opens on the timetables (the set is too small to watch there); ?tv=1 or a channel asks for the set anyway.
   if (matchMedia('(max-width: 700px)').matches && !/[?&](tv|ch)=/.test(location.search)) location.replace('timetable.html');
