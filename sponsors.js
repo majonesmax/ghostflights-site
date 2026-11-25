@@ -55,6 +55,38 @@ window.SPONSORS = (() => {
       S('Ozark Mountain Cabins', 'cabin', ['Lakefront cabins with a fireplace.', 'Bring the boat.'], 'Down in the Ozarks', '555-0183', '#1e3018', '#d8f0b0'),
       skyarium('St. Louis'),
     ],
+    TW1930: [
+      S('Lambert Lanes', 'bowling', ['36 lanes and a snack bar.', 'Bowl a 300, your name goes on the wall.'], 'Across from Lambert Field', '555-0133', '#3a1418', '#ffc0a0'),
+      S('Gateway Toasted Ravioli', 'food', ['Toasted ravioli by the dozen.', 'Pizza by the square, cut thin.'], 'The Hill, St. Louis', '555-0121', '#2a2010', '#ffd07a'),
+      S('Midtown Video Exchange', 'video', ['Trade in your old tapes.', 'Members rent for 99 cents.'], 'Manhattan', '555-0187', '#141a3a', '#a0c0ff'),
+      S('Starlite Diner', 'food', ['Open 24 hours.', 'Coffee and a slice of pie for the red-eye.'], 'Queens, by the airport', '555-0106', '#3a1a2a', '#ffb0c8'),
+      S('Big River Arcade', 'arcade', ['Fifty games and air hockey.', 'Free tokens on your birthday.'], 'St. Charles', '555-0179', '#101a30', '#7ae0ff'),
+      skyarium('St. Louis'),
+    ],
+    PA1927: [
+      S('Midtown Luggage Co.', 'luggage', ['Garment bags and hard cases.', 'Monogrammed while you wait.'], 'Midtown Manhattan', '555-0139', '#10204a', '#c8d8ff'),
+      S('Little Havana Cafe', 'food', ['Cuban coffee and pastelitos.', 'A sandwich for the flight home.'], 'Calle Ocho, Miami', '555-0112', '#3a1a0e', '#ffd07a'),
+      S('Kennedy Motor Hotel', 'motel', ['Rooms by the night or the afternoon.', 'Shuttle to every terminal.'], 'Queens, by Kennedy', '555-0148', '#1e2a3a', '#e8e0b0'),
+      S('Key Biscayne Boat Rental', 'boat', ['Runabouts by the hour.', 'Fishing tackle included.'], 'Key Biscayne', '555-0167', '#0e3a4a', '#9af0e8'),
+      S('Times Square Arcade', 'arcade', ['Every new game first.', 'Open till two in the morning.'], 'West 42nd Street', '555-0176', '#2a0e30', '#ff8ae0'),
+      skyarium('New York'),
+    ],
+    PI1948: [
+      S('Queen City Bowl', 'bowling', ['24 lanes and bumper bowling for the kids.', 'Leagues every night.'], 'Charlotte', '555-0134', '#1a2a4a', '#ffd23c'),
+      S('Carolina Pit Barbecue', 'food', ['Chopped pork with a vinegar sauce.', 'Hushpuppies come with every plate.'], 'Off Wilkinson Boulevard', '555-0116', '#3a1a0e', '#ffcf6a'),
+      S('Harbor Crab House', 'food', ['Steamed crabs by the dozen.', 'Paper on the table and a mallet each.'], 'Baltimore', '555-0109', '#0e2a3a', '#ff9a6a'),
+      S('Piedmont TV & Stereo', 'tv', ['We fix any set we sell.', 'Car stereos put in too.'], 'Near the airport', '555-0157', '#2a2414', '#ffcf8a'),
+      S('Blue Ridge Cabins', 'cabin', ['Mountain cabins with a porch swing.', 'Two hours from the airport.'], 'Up in the mountains', '555-0184', '#1e3018', '#d8f0b0'),
+      skyarium('Charlotte'),
+    ],
+    OC1967: [
+      S('Orange County Roller Disco', 'skate', ['Disco skate every Friday.', 'Skate rental a dollar.'], 'Near the airport', '555-0128', '#3a1240', '#ff9ad8'),
+      S('Harbor Fish & Chips', 'food', ['Fried fish on the pier.', 'Chowder in a bread bowl.'], 'Newport Beach', '555-0113', '#0e3448', '#ffe0a0'),
+      S('Bay Area Video Club', 'video', ['VHS and Beta. No late fees on Sundays.', 'Join for free.'], 'Oakland', '555-0188', '#1a1a3a', '#a0b8ff'),
+      S('Sunset Strip Records', 'record', ['New wave, punk and import singles.', 'Listening booths in the back.'], 'Hollywood', '555-0192', '#1a1a1a', '#ff7a7a'),
+      S('Laguna Surf Shack', 'surf', ['Board rentals by the hour.', 'Lessons every morning at seven.'], 'Laguna Beach', '555-0136', '#0e3448', '#ffd06a'),
+      skyarium('San Francisco'),
+    ],
   };
 })();
 
@@ -79,6 +111,7 @@ window.SPONSOR_ICONS = {
   computer(g, ink) { g.strokeStyle = ink; g.lineWidth = 3; g.strokeRect(-16, -18, 32, 22); g.fillStyle = ink; g.fillRect(-11, -13, 10, 2); g.fillRect(-11, -8, 16, 2); g.fillRect(-20, 8, 40, 9); g.fillStyle = '#000'; for (let i = 0; i < 6; i++) g.fillRect(-16 + i * 6, 11, 4, 3); },
   boat(g, ink) { g.fillStyle = ink; g.beginPath(); g.moveTo(-22, 6); g.lineTo(22, 6); g.lineTo(16, 14); g.lineTo(-16, 14); g.fill(); g.fillRect(-14, -4, 26, 10); g.fillRect(-6, -14, 4, 10); g.fillRect(4, -14, 4, 10); g.beginPath(); g.arc(-18, 0, 7, 0, 7); g.lineWidth = 2; g.strokeStyle = ink; g.stroke(); },
   cone(g, ink) { g.fillStyle = ink; g.beginPath(); g.arc(0, -8, 11, Math.PI, 0); g.fill(); g.fillStyle = '#c88a40'; g.beginPath(); g.moveTo(-11, -8); g.lineTo(11, -8); g.lineTo(0, 20); g.fill(); },
+  luggage(g, ink) { g.fillStyle = ink; g.fillRect(-20, -10, 40, 28); g.strokeStyle = ink; g.lineWidth = 3; g.strokeRect(-7, -17, 14, 8); g.fillStyle = '#000'; g.fillRect(-20, 2, 40, 2); g.fillRect(-14, -10, 2, 28); g.fillRect(12, -10, 2, 28); },
   cabin(g, ink) { g.fillStyle = ink; g.beginPath(); g.moveTo(-20, -2); g.lineTo(0, -18); g.lineTo(20, -2); g.fill(); g.fillRect(-16, -2, 32, 20); g.fillStyle = '#000'; g.fillRect(-4, 6, 8, 12); g.fillStyle = ink; g.fillRect(8, -16, 5, 10); },
   // Skyarium: a night sky over a hill, a star and a plane's light.
   sky(g, ink) { g.fillStyle = ink; g.beginPath(); g.moveTo(-34, 22); g.quadraticCurveTo(-6, 6, 34, 18); g.lineTo(34, 24); g.lineTo(-34, 24); g.fill(); for (const [x, y] of [[-24, -14], [14, -20], [4, -6], [26, -6], [-12, -2]]) g.fillRect(x, y, 3, 3); g.fillRect(-30, -18, 22, 2.5); g.fillStyle = '#ff6b5b'; g.beginPath(); g.arc(-6, -17, 4.5, 0, 7); g.fill(); },

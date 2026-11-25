@@ -87,7 +87,7 @@
   <div class="bezel"></div>
   <div class="panel"><span class="badge">Skyarium</span><span class="grille"></span>
     <div class="control"><div class="dial"><span style="--a: -50deg">OFF</span><span style="--a: 50deg">ON</span><button class="knob volume" aria-label="Volume (M)"></button></div><span class="caption">VOLUME</span></div>
-    <div class="control"><div class="dial"><span style="--a: -75deg">0</span><span style="--a: -50deg">1</span><span style="--a: -25deg">2</span><span style="--a: 0deg">3</span><span style="--a: 25deg">4</span><span style="--a: 50deg">5</span><span style="--a: 75deg">6</span><button class="knob channel" aria-label="Channel (arrow keys, 0 to 6)"></button></div><span class="caption">CHANNEL</span></div>
+    <div class="control"><div class="dial"><span style="--a: -75deg">0</span><span style="--a: -60deg">1</span><span style="--a: -45deg">2</span><span style="--a: -30deg">3</span><span style="--a: -15deg">4</span><span style="--a: 0deg">5</span><span style="--a: 15deg">6</span><span style="--a: 30deg">7</span><span style="--a: 45deg">8</span><span style="--a: 60deg">9</span><span style="--a: 75deg">10</span><button class="knob channel" aria-label="Channel (arrow keys, 0 to 9)"></button></div><span class="caption">CHANNEL</span></div>
   </div>
 </div>
 <div class="set">
@@ -102,7 +102,7 @@
 <script>
   // The set. It tunes the station (station.html?ch=…) in its screen, draws its own on-screen display, plays the music
   // and has two knobs: channel and volume. ?ch= picks the channel; ?t= and ?speed= pass through to the station.
-  const CHS = ['0', '1', '2', '3', '4', '5', '6']; // 0 is the guide (guide.html); 1 to 6 an airline each (data/boards.json)
+  const CHS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']; // 0 is the guide (guide.html); 1 to 10 an airline each (data/boards.json)
   const params = new URLSearchParams(location.search);
   const set = document.querySelector('.set'), screen = set.querySelector('iframe');
   const channelKnob = document.querySelector('.knob.channel'), volumeKnob = document.querySelector('.knob.volume');
@@ -129,7 +129,7 @@
     snowCtx.putImageData(img, 0, 0);
     requestAnimationFrame(hiss);
   }
-  // The channel knob points at the channel: 0 to 6 from -75° to 75°, twenty-five degrees a notch. Past 6 it swings
+  // The channel knob points at the channel: 0 to 10 from -75° to 75°, fifteen degrees a notch. Past 10 it swings
   // back to 0, as a dial with a stop does.
   // A watchdog on every change of channel: no picture in 12 seconds and the set tunes again; no picture the second
   // time and it says NO SIGNAL rather than leave the snow up. What went wrong is kept (window.setLog) and shown.
@@ -144,7 +144,7 @@
       else { snowing = false; osd('NO SIGNAL', 60000); }
     }, 12000);
     ch = next;
-    channelKnob.style.setProperty('--turn', `${-75 + 25 * CHS.indexOf(ch)}deg`);
+    channelKnob.style.setProperty('--turn', `${-75 + 15 * CHS.indexOf(ch)}deg`);
     const q = new URLSearchParams({ ch });
     for (const k of ['t', 'speed']) if (params.get(k)) q.set(k, params.get(k));
     history.replaceState(null, '', `?${new URLSearchParams({ ...Object.fromEntries(params), ch })}`);

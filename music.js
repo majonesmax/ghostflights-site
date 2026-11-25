@@ -17,6 +17,10 @@
     4: { bpm: 100, keyShift: 4, seed: 404, lead: 'triangle', bass: [0, 0, 0, 12, 0, 0, 7, 12], bell: 2.5, textures: ['lead', 'lead', 'arp'] },
     5: { bpm: 120, keyShift: 5, seed: 505, lead: 'sawtooth', bass: [0, 12, 7, 12, 0, 12, 7, 5], bell: 3.5, textures: ['stabs', 'arp', 'lead'] },
     6: { bpm: 108, keyShift: 3, seed: 606, lead: 'square', bass: [0, 7, 0, 12, 0, 7, 10, 12], bell: 3.0, textures: ['arp', 'stabs', 'lead'] },
+    7: { bpm: 116, keyShift: 1, seed: 707, lead: 'sawtooth', bass: [0, 0, 12, 0, 7, 0, 12, 10], bell: 3.5, textures: ['stabs', 'lead', 'arp'] },
+    8: { bpm: 102, keyShift: 4, seed: 808, lead: 'triangle', bass: [0, 12, 7, 12, 0, 12, 7, 12], bell: 2.5, textures: ['arp', 'lead', 'lead'] },
+    9: { bpm: 110, keyShift: 2, seed: 909, lead: 'square', bass: [0, 0, 7, 12, 0, 0, 7, 5], bell: 3.0, textures: ['lead', 'arp', 'stabs'] },
+    10: { bpm: 122, keyShift: 5, seed: 1010, lead: 'square', bass: [0, 12, 0, 7, 0, 12, 0, 10], bell: 4.0, textures: ['stabs', 'arp', 'arp'] },
   };
   let F = FLAVORS[1], BEAT = 60 / F.bpm, BAR = BEAT * 4;
   function flavor(ch) { F = FLAVORS[ch] || FLAVORS[1]; BEAT = 60 / F.bpm; BAR = BEAT * 4; }
