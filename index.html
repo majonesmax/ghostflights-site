@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ghostflights</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  /* Around the set, Skyarium's world (its site's hero): dusk going down to the glow at the horizon, the stars, a plane
+     crossing, the layered land. Ghostflights is a channel playing in it. */
+  body { background: linear-gradient(180deg, #121430 0%, #2a2350 38%, #5b3a63 62%, #b3606a 80%, #eaa46a 92%, #f6c68a 100%); }
+  .stars { position: fixed; inset: 0 0 45% 0; background-image:
+      radial-gradient(1px 1px at 12% 18%, #fff9 50%, transparent 51%), radial-gradient(1px 1px at 28% 8%, #fff7 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 44% 22%, #fffa 50%, transparent 51%), radial-gradient(1px 1px at 63% 12%, #fff8 50%, transparent 51%),
+      radial-gradient(1px 1px at 78% 27%, #fff6 50%, transparent 51%), radial-gradient(1.5px 1.5px at 90% 9%, #fff9 50%, transparent 51%),
+      radial-gradient(1px 1px at 6% 35%, #fff5 50%, transparent 51%), radial-gradient(1px 1px at 55% 33%, #fff5 50%, transparent 51%); }
+  .land { position: fixed; left: 0; right: 0; bottom: 0; width: 100%; height: 30%; display: block; }
+  .sky-plane { position: fixed; top: 12%; left: -10%; width: 220px; height: 3px; animation: fly 40s linear infinite; }
+  .sky-plane::before { content: ""; position: absolute; right: 0; top: -3px; width: 8px; height: 8px; border-radius: 50%;
+    background: #ff6b5b; box-shadow: 0 0 12px 4px #ff6b5b88; animation: blink 1.2s steps(1) infinite; }
+  .sky-plane::after { content: ""; position: absolute; inset: 0 8px 0 0; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, #f7c98b55 70%, #fff3e0aa); }
+  @keyframes fly { from { transform: translate(0, 0); } to { transform: translate(125vw, -60px); } }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .sky-plane { animation: none; left: 70%; } .sky-plane::before { animation: none; } }
+  /* The set: a wood cabinet, the screen's dark bezel, and under it the maker's badge, the speaker and two knobs. Sizes
+     in em of the cabinet's font size, which fit() sets from the screen's width. */
+  .cabinet { position: absolute; border-radius: 0.9em; box-shadow: 0 1.4em 3em rgba(10, 6, 20, 0.6), inset 0 0.08em 0 rgba(255, 230, 200, 0.25), inset 0 -0.15em 0 rgba(0, 0, 0, 0.35);
+    background: repeating-linear-gradient(92deg, rgba(0, 0, 0, 0.05) 0 0.12em, transparent 0.12em 0.5em, rgba(255, 220, 170, 0.04) 0.5em 0.62em, transparent 0.62em 1.1em),
+      linear-gradient(180deg, #7a4a2a, #5e3720 55%, #4e2d1a); }
+  .cabinet .bezel { position: absolute; border-radius: 0.7em; background: linear-gradient(160deg, #2a2420, #121010); box-shadow: inset 0 0.1em 0.3em rgba(0, 0, 0, 0.8); }
+  .cabinet .panel { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 1.6em; }
+  .cabinet .badge { font: italic 700 1.05em/1 Georgia, serif; letter-spacing: 0.05em; color: #e9dcc4;
+    text-shadow: 0 0.04em 0 #2c180c, 0 -0.03em 0 rgba(255, 255, 255, 0.4); }
+  .cabinet .grille { flex: 1; height: 1.3em; margin: 0 1.6em; border-radius: 0.2em;
+    background: repeating-linear-gradient(90deg, #2b1a10 0 0.12em, #6a4026 0.12em 0.36em); opacity: 0.85; }
+  /* The set's two knobs, its only controls: channel (0, the guide, to 5, printed round it) and volume (off and on).
+     A click turns one a notch. --k makes them bigger where the set is small (phones), so they're easy to hit. */
+  .cabinet .control, .dock .control { display: flex; flex-direction: column; align-items: center; margin-left: 1.1em; font-size: calc(1em * var(--k, 1)); }
+  .cabinet .dial, .dock .dial { position: relative; width: 3.6em; height: 3em; }
+  .cabinet .dial span, .dock .dial span { position: absolute; left: 50%; top: 58%; font: 700 0.42em/1 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #e9dcc4;
+    transform: translate(-50%, -50%) rotate(var(--a)) translateY(-3.55em) rotate(calc(-1 * var(--a))); }
+  .cabinet .knob, .dock .knob { position: absolute; left: 50%; top: 58%; width: 2.2em; height: 2.2em; margin: -1.1em 0 0 -1.1em; padding: 0; border: 0; border-radius: 50%;
+    cursor: pointer; transform: rotate(var(--turn, 0deg)); transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1);
+    background: repeating-conic-gradient(rgba(0, 0, 0, 0.14) 0 4deg, transparent 4deg 12deg), radial-gradient(circle at 35% 30%, #efe6d4, #b3a48c 60%, #75664f);
+    box-shadow: 0 0.15em 0.25em rgba(0, 0, 0, 0.6), inset 0 0 0 0.12em rgba(60, 40, 20, 0.35); -webkit-tap-highlight-color: transparent; }
+  .cabinet .knob::after, .dock .knob::after { content: ""; position: absolute; left: 50%; top: 0.14em; width: 0.16em; height: 0.75em; margin-left: -0.08em; border-radius: 0.08em; background: #3a2a1c; }
+  .cabinet .knob:focus-visible, .dock .knob:focus-visible { outline: 0.1em solid #f7c98b; outline-offset: 0.12em; }
+  .cabinet .caption, .dock .caption { margin-top: 0.1em; font: 700 0.4em/1 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: 0.16em; color: #e9dcc4; }
+  /* A line of links on the land under the set. */
+  .links { position: fixed; left: 0; right: 0; bottom: 14px; text-align: center; font: 500 13px/1.4 -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #f3ede4cc; }
+  .links a { color: #f7c98b; text-decoration: none; margin: 0 8px; }
+  .links .site { color: #f3ede4cc; }
+  .links a:hover { text-decoration: underline; }
+  /* The bigger picture: the screen fills the window, the cabinet fades and the knobs move to a small plaque. */
+  .set, .cabinet { transition: left 0.5s ease, top 0.5s ease, width 0.5s ease, height 0.5s ease, opacity 0.4s ease; }
+  body.big .cabinet { opacity: 0; pointer-events: none; }
+  .dock { position: absolute; display: none; gap: 0.2em; padding: 0.5em 0.9em 0.45em; border-radius: 0.6em; transition: opacity 0.4s;
+    background: repeating-linear-gradient(92deg, rgba(0, 0, 0, 0.05) 0 0.12em, transparent 0.12em 0.5em), linear-gradient(180deg, #7a4a2a, #4e2d1a);
+    box-shadow: 0 0.6em 1.5em rgba(10, 6, 20, 0.55), inset 0 0.08em 0 rgba(255, 230, 200, 0.25); }
+  body.big .dock { display: flex; }
+  .dock .control { margin-left: 0; font-size: calc(1em * var(--k, 1)); }
+  .links button { font: inherit; color: #f7c98b; background: none; border: 0; padding: 0; margin: 0 8px; cursor: pointer; }
+  .links button:hover { text-decoration: underline; }
+  @media (max-width: 520px) { .links { font-size: 12px; } .links .site, .links .ol { display: none; } .links a, .links button { margin: 0 6px; } }
+  /* The set: the station's picture (station.html) inside it, and what the set itself draws over it. Changing channel
+     retunes the picture; the set, its knobs and the music stay. */
+  .set { position: absolute; overflow: hidden; background: #000; border-radius: 1.6% / 2.1%; }
+  .set iframe { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 0; }
+  .set.rolling iframe { animation: roll 0.42s cubic-bezier(0.2, 0.7, 0.3, 1); }
+  @keyframes roll { 0% { top: -22%; } 70% { top: 2%; } 100% { top: 0; } }
+  canvas.snow { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  /* The set's own on-screen display (not the station's graphics): green, blocky, top left, for a moment. */
+  .osd { position: absolute; left: 5.8%; top: 6%; font: 700 1em/1 Menlo, 'Courier New', monospace; letter-spacing: 0.1em;
+    color: #4cf08a; text-shadow: 0 0 0.18em rgba(76, 240, 138, 0.55), 0.06em 0.06em 0 #000; display: none; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="stars" aria-hidden="true"></div>
+<div class="sky-plane" aria-hidden="true"></div>
+<svg class="land" viewBox="0 0 1440 300" preserveAspectRatio="none" aria-hidden="true">
+  <path fill="#8b5a73" fill-opacity="0.75" d="M0 150 C120 120 210 140 320 118 C430 96 520 128 640 110 C760 92 860 126 980 104 C1100 84 1220 120 1320 102 C1380 92 1420 100 1440 96 V300 H0Z"/>
+  <path fill="#55395a" d="M0 196 C60 184 110 192 170 176 C200 168 230 186 270 180 C330 170 380 190 450 182 C520 172 560 158 600 170 C660 186 720 176 800 182 C880 188 930 166 990 172 C1060 180 1110 190 1180 178 C1250 166 1310 184 1380 176 C1410 172 1430 176 1440 178 V300 H0Z"/>
+  <path fill="#2a2038" d="M0 236 L20 228 L34 238 L52 226 L70 236 L96 230 L118 240 L150 232 L176 242 L210 234 L240 244 L280 236 L320 246 L360 238 L400 246 L450 240 L500 248 L560 240 L620 248 L690 242 L760 250 L840 242 L910 250 L980 242 L1050 250 L1120 240 L1190 248 L1260 238 L1320 246 L1380 236 L1440 242 V300 H0Z"/>
+</svg>
+<div class="cabinet">
+  <div class="bezel"></div>
+  <div class="panel"><span class="badge">Skyarium</span><span class="grille"></span>
+    <div class="control"><div class="dial"><span style="--a: -50deg">OFF</span><span style="--a: 50deg">ON</span><button class="knob volume" aria-label="Volume (M)"></button></div><span class="caption">VOLUME</span></div>
+    <div class="control"><div class="dial"><span style="--a: -75deg">0</span><span style="--a: -50deg">1</span><span style="--a: -25deg">2</span><span style="--a: 0deg">3</span><span style="--a: 25deg">4</span><span style="--a: 50deg">5</span><span style="--a: 75deg">6</span><button class="knob channel" aria-label="Channel (arrow keys, 0 to 6)"></button></div><span class="caption">CHANNEL</span></div>
+  </div>
+</div>
+<div class="set">
+  <iframe title="Ghostflights"></iframe>
+  <iframe class="national" title="Ghostflights, across the country" style="visibility: hidden"></iframe>
+  <canvas class="snow" width="160" height="120"></canvas>
+  <div class="osd"></div>
+</div>
+<div class="dock"></div>
+<nav class="links"><a class="site" href="about.html">ghostflights.tv</a><a href="about.html">About</a><button class="size" type="button">Bigger picture</button><a href="feed.html">The feed</a><a href="https://skyarium.app">Skyarium</a><a class="ol" href="https://majonesmax.github.io/open-liveries/">Open Liveries</a></nav>
+<script src="music.js"></script>
+<script>
+  // The set. It tunes the station (station.html?ch=…) in its screen, draws its own on-screen display, plays the music
+  // and has two knobs: channel and volume. ?ch= picks the channel; ?t= and ?speed= pass through to the station.
+  const CHS = ['0', '1', '2', '3', '4', '5', '6']; // 0 is the guide (guide.html); 1 to 6 an airline each (data/boards.json)
+  const params = new URLSearchParams(location.search);
+  const set = document.querySelector('.set'), screen = set.querySelector('iframe');
+  const channelKnob = document.querySelector('.knob.channel'), volumeKnob = document.querySelector('.knob.volume');
+
+  // The channel to start on when none is asked for: the viewer's own region, by the time zone the browser reports.
+  function homeChannel() {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    // The airline that flew most where the viewer is: Western out West, Northwest in the middle, Eastern in the East.
+    if (/^America\/(Los_Angeles|Vancouver|Tijuana|Anchorage|Juneau|Sitka|Nome|Phoenix|Denver|Boise|Edmonton|Whitehorse)|^Pacific\/Honolulu/.test(tz)) return '4';
+    if (/^America\/(Chicago|Winnipeg|Menominee|North_Dakota|Indiana\/(Knox|Tell_City))/.test(tz)) return '1';
+    if (/^America\/(New_York|Detroit|Toronto|Indiana|Kentucky|Louisville)/.test(tz)) return '3';
+    return '1';
+  }
+  let ch = CHS.includes(params.get('ch')) ? params.get('ch') : homeChannel();
+  const chName = (c) => (c === '0' ? 'GUIDE' : `CH ${c.padStart(2, '0')}`);
+
+  // Snow between channels, then the picture rolls in and the set shows the channel number.
+  const snow = set.querySelector('canvas.snow'), snowCtx = snow.getContext('2d');
+  let snowing = false;
+  function hiss() {
+    if (!snowing) return;
+    const img = snowCtx.createImageData(160, 120);
+    for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+    snowCtx.putImageData(img, 0, 0);
+    requestAnimationFrame(hiss);
+  }
+  // The channel knob points at the channel: 0 to 6 from -75° to 75°, twenty-five degrees a notch. Past 6 it swings
+  // back to 0, as a dial with a stop does.
+  // A watchdog on every change of channel: no picture in 12 seconds and the set tunes again; no picture the second
+  // time and it says NO SIGNAL rather than leave the snow up. What went wrong is kept (window.setLog) and shown.
+  let watchdog = 0;
+  window.setLog = [];
+  const note = (words) => { window.setLog.push(`${new Date().toLocaleTimeString()} CH ${ch}: ${words}`); console.warn('[set]', words); };
+  function tune(next, again = false) {
+    clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      note(again ? 'no picture after a second try' : 'no picture in 12 s, tuning again');
+      if (!again) tune(ch, true);
+      else { snowing = false; osd('NO SIGNAL', 60000); }
+    }, 12000);
+    ch = next;
+    channelKnob.style.setProperty('--turn', `${-75 + 25 * CHS.indexOf(ch)}deg`);
+    const q = new URLSearchParams({ ch });
+    for (const k of ['t', 'speed']) if (params.get(k)) q.set(k, params.get(k));
+    history.replaceState(null, '', `?${new URLSearchParams({ ...Object.fromEntries(params), ch })}`);
+    document.title = `Ghostflights · CH ${ch}`;
+    set.classList.remove('rolling');
+    snow.style.transition = 'none'; snow.style.opacity = 1; snow.style.display = 'block';
+    if (!snowing) { snowing = true; hiss(); }
+    osd(chName(ch), 60000);
+    Muzak.tune(ch); // the music cuts to static until the picture is in
+    screen.src = `${ch === '0' ? 'guide' : 'station'}.html?${q}`;
+  }
+  function tunedIn() {
+    clearTimeout(watchdog);
+    void set.offsetWidth; // restart the roll
+    set.classList.add('rolling');
+    snow.style.transition = 'opacity 0.45s'; snow.style.opacity = 0;
+    setTimeout(() => { snowing = false; snow.style.display = 'none'; }, 500);
+    osd(chName(ch), 2600);
+    Muzak.tunedIn(); // and this channel's music comes in where it is
+  }
+  const surf = (d) => tune(CHS[(CHS.indexOf(ch) + d + CHS.length) % CHS.length]);
+
+  // The set's on-screen display: a word or two for a moment.
+  const osdEl = set.querySelector('.osd');
+  let osdTimer = 0;
+  function osd(words, ms = 2200) {
+    osdEl.textContent = words; osdEl.style.display = 'block';
+    clearTimeout(osdTimer);
+    osdTimer = setTimeout(() => { osdEl.style.display = 'none'; }, ms);
+  }
+
+  // The music (music.js), off until turned on; the volume knob shows which, and the set's display says so.
+  function sound(on) {
+    try { sessionStorage.setItem('ghostflights-sound', on ? 'on' : 'off'); } catch {}
+    if (on) Muzak.start(); else Muzak.stop();
+    volumeKnob.style.setProperty('--turn', on ? '50deg' : '-50deg');
+    osd(on ? 'SOUND ♪' : 'SOUND OFF');
+  }
+  volumeKnob.style.setProperty('--turn', '-50deg');
+  // Sound left on in this tab comes back with the next key or tap (browsers wait for one before playing).
+  let soundWanted = false;
+  try { soundWanted = sessionStorage.getItem('ghostflights-sound') === 'on'; } catch {}
+  if (soundWanted) volumeKnob.style.setProperty('--turn', '50deg');
+
+  // "Across the country": every five minutes each airline's channel cuts to the national board, its airline's whole
+  // network coast to coast, for 45 seconds, then back; the clock decides, so every viewer sees it together. The national picture loads in a
+  // second screen a few seconds before (no snow), and goes when the segment ends. Not on the guide.
+  const national = set.querySelector('iframe.national');
+  const ACROSS = { every: 300000, length: 45000, at: 150000, early: 8000 };
+  const SPEED = +(params.get('speed') || 1), START_REAL = Date.now(), START = params.get('t') ? Date.parse(params.get('t')) : START_REAL;
+  const clockNow = () => START + (Date.now() - START_REAL) * SPEED;
+  let acrossFor = '', acrossReady = false;
+  function across() {
+    const t = clockNow(), slot = Math.floor((t - ACROSS.at + ACROSS.early) / ACROSS.every);
+    const into = t - (slot * ACROSS.every + ACROSS.at); // ms into this slot's segment (negative while loading)
+    const want = ch !== '0' && into > -ACROSS.early && into < ACROSS.length ? `${ch}:${slot}` : '';
+    if (want !== acrossFor) {
+      acrossFor = want; acrossReady = false;
+      const q = new URLSearchParams({ ch: `N${ch}`, host: ch });
+      for (const k of ['t', 'speed']) if (params.get(k)) q.set(k, params.get(k));
+      national.src = want ? `station.html?${q}` : 'about:blank';
+    }
+    const showing = !!want && acrossReady && into >= 0;
+    national.style.visibility = showing ? 'visible' : 'hidden';
+    screen.style.visibility = showing ? 'hidden' : 'visible';
+  }
+  setInterval(across, 500);
+
+  // Every control: the knobs, or the keyboard (here or in the picture).
+  function press(k) {
+    if (soundWanted) { soundWanted = false; if (k !== 'm' && k !== 'M') sound(true); }
+    if (CHS.includes(k)) { if (k !== ch) tune(k); else osd(chName(k)); }
+    else if (k === 'ArrowUp' || k === 'ArrowRight') surf(1);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') surf(-1);
+    else if (k === 'm' || k === 'M') sound(!Muzak.playing());
+    else if (k === 'g' || k === 'G' || k === '?') { if (ch !== '0') tune('0'); }
+    else if (k === 'f' || k === 'F') setBig(!big);
+    else return false;
+    return true;
+  }
+  addEventListener('keydown', (e) => { if (!e.metaKey && !e.ctrlKey && press(e.key)) e.preventDefault(); });
+  channelKnob.addEventListener('click', () => { if (soundWanted) { soundWanted = false; sound(true); } surf(1); });
+  volumeKnob.addEventListener('click', () => { soundWanted = false; sound(!Muzak.playing()); });
+  addEventListener('message', (e) => {
+    if (e.source === national.contentWindow && e.data) {
+      if (e.data.ready === `N${ch}`) acrossReady = true;
+      if (e.data.key) press(e.data.key);
+      if (e.data.swipe) surf(e.data.swipe);
+      return;
+    }
+    if (e.source !== screen.contentWindow || !e.data) return;
+    if (e.data.ready === ch) tunedIn();
+    if (e.data.error) { note(e.data.error); osd(`ERR ${e.data.error}`.slice(0, 48), 8000); }
+    if (e.data.key) press(e.data.key);
+    if (e.data.swipe) surf(e.data.swipe);
+    if (e.data.chime && Muzak.playing() && !Muzak.held()) Muzak.chime();
+    if (e.data.wake && soundWanted) { soundWanted = false; sound(true); }
+  });
+  // The bigger picture: the screen fills the window and the knobs go to a plaque beside it (F, or the link below).
+  const dock = document.querySelector('.dock'), panel = document.querySelector('.panel'), sizeButton = document.querySelector('.links .size');
+  let big = false;
+  try { big = sessionStorage.getItem('ghostflights-big') === 'on'; } catch {}
+  if (params.get('view') === 'big') big = true; // ?view=big, for a link or a test
+  function setBig(on) {
+    big = on;
+    try { sessionStorage.setItem('ghostflights-big', on ? 'on' : 'off'); } catch {}
+    document.body.classList.toggle('big', on);
+    for (const c of document.querySelectorAll('.control')) (on ? dock : panel).appendChild(c);
+    sizeButton.textContent = on ? 'Back to the set' : 'Bigger picture';
+    fit();
+  }
+  sizeButton.addEventListener('click', () => setBig(!big));
+
+  // A swipe up or down on the picture turns the channel too.
+  let touchY = null;
+  addEventListener('touchstart', (e) => { if (!e.target.closest('.knob')) touchY = e.touches[0].clientY; }, { passive: true });
+  addEventListener('touchend', (e) => {
+    if (touchY === null) return;
+    const dy = e.changedTouches[0].clientY - touchY; touchY = null;
+    if (Math.abs(dy) > 60) surf(dy < 0 ? 1 : -1);
+  });
+
+  // The set: the largest that fits above the links, its screen 4:3. The cabinet around the screen, in parts of the
+  // screen's size: a twentieth at the sides and top, and below enough for the panel with knobs big enough to use.
+  const CAB = { side: 0.05, top: 0.05 };
+  const cabinet = document.querySelector('.cabinet'), bezel = cabinet.querySelector('.bezel');
+  function fit() {
+    const links = 44, tall = innerHeight > innerWidth * 1.2;
+    if (big) return fitBig(links, tall);
+    const fitW = innerWidth - (tall ? 24 : 80), fitH = (innerHeight - links - 40) * (tall ? 0.7 : 1);
+    // Knobs at least 40px across: on a small set, the panel grows to hold them.
+    const layout = (s) => {
+      const w = 1440 * s, em = w / 42, k = Math.max(1, 40 / (2.2 * em));
+      const bottom = Math.max(0.15, em * (3.6 * k + 0.3) / (1080 * s));
+      return { w, h: 1080 * s, em, k, bottom, cw: w * (1 + 2 * CAB.side), ch: 1080 * s * (1 + CAB.top + bottom) };
+    };
+    let s = Math.min(fitW / (1440 * (1 + 2 * CAB.side)), fitH / (1080 * 1.2));
+    let L = layout(s);
+    s = Math.min(fitW / (L.cw / s), fitH / (L.ch / s)); L = layout(s);
+    const cx = (innerWidth - L.cw) / 2, cy = tall ? Math.max(16, (innerHeight - links) * 0.12) : (innerHeight - links - L.ch) / 2;
+    Object.assign(cabinet.style, { left: `${cx}px`, top: `${cy}px`, width: `${L.cw}px`, height: `${L.ch}px`, fontSize: `${L.em}px` });
+    cabinet.style.setProperty('--k', L.k);
+    Object.assign(bezel.style, { left: `${L.w * CAB.side * 0.55}px`, top: `${L.h * CAB.top * 0.55}px`, width: `${L.w * (1 + CAB.side * 0.9)}px`, height: `${L.h * (1 + CAB.top * 0.9)}px` });
+    cabinet.querySelector('.panel').style.height = `${L.h * L.bottom * 0.95}px`;
+    Object.assign(set.style, { left: `${cx + L.w * CAB.side}px`, top: `${cy + L.h * CAB.top}px`, width: `${L.w}px`, height: `${L.h}px`, fontSize: `${46 * s}px` });
+  }
+  // The bigger picture: the largest 4:3 screen above the links, the plaque in the margin beside it (or under it on a
+  // phone, or over its corner when there's no margin).
+  function fitBig(links, tall) {
+    const s = Math.min((innerWidth - 24) / 1440, (innerHeight - links - 24) / 1080), w = 1440 * s, h = 1080 * s;
+    const x = (innerWidth - w) / 2, y = tall ? Math.max(16, (innerHeight - links) * 0.08) : (innerHeight - links - h) / 2;
+    Object.assign(set.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px`, fontSize: `${46 * s}px` });
+    const em = Math.max(12, Math.min(22, w / 42));
+    dock.style.fontSize = `${em}px`;
+    dock.style.setProperty('--k', Math.max(1, 40 / (2.2 * em)));
+    const dw = dock.offsetWidth, dh = dock.offsetHeight;
+    let dx, dy;
+    if (x >= dw + 32) { dx = x + w + (x - dw) / 2; dy = y + h - dh; } // the margin beside
+    else if (innerHeight - links - (y + h) >= dh + 24) { dx = (innerWidth - dw) / 2; dy = y + h + 16; } // under
+    else { dx = x + w - dw - 12; dy = y + h - dh - 12 - h * 0.07; } // over the corner, above the crawl
+    Object.assign(dock.style, { left: `${dx}px`, top: `${dy}px` });
+  }
+  addEventListener('resize', fit);
+  if (big) setBig(true); else fit();
+  tune(ch);
+  if (soundWanted) setTimeout(() => osd('PRESS ANY KEY FOR SOUND', 5000), 3200);
+</script>
+</body>
+</html>

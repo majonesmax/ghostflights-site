@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ghostflights · CH 2</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  .stage { position: absolute; left: 50%; top: 50%; width: 1440px; height: 1080px; transform-origin: 0 0; }
+  .frame { position: relative; width: 1440px; height: 1080px; overflow: hidden; background: #2a2218; }
+  /* The tape look goes on the lens, which is the frame's size, not on the camera inside it: on the camera it was
+     filtered at the zoom (three times the frame each way on a close shot) and Chrome dropped tiles. */
+  .lens { position: absolute; inset: 0; overflow: hidden; filter: url(#tape) saturate(1.02) contrast(1.05); }
+  .camera { position: absolute; left: 0; top: 0; width: 1440px; height: 1080px; transform-origin: 0 0; }
+  .board { position: absolute; inset: 0; width: 1440px; height: 1080px; }
+  .board.labels { pointer-events: none; } /* the cities, over the route lines */
+  svg.arcs { position: absolute; inset: 0; overflow: visible; }
+  .arc { fill: none; stroke-linecap: round; }
+  /* A flight on the board: a round pin in its airline's ink (lighter leaving a hub, darker heading in), white-rimmed, the same size
+     on every camera (--inv undoes the zoom). The element is bigger than the pin so it's easy to click. */
+  .marker { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; cursor: pointer;
+    transform: scale(var(--inv, 1)) rotate(var(--hdg, 0deg)); }
+  .marker::after { content: ""; position: absolute; left: 7px; top: 7px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--ink); box-shadow: 0 0 0 2px #fbf8f0, 0 0 0 3.2px rgba(30, 22, 14, 0.75), 1px 1px 2px 2px rgba(20, 15, 10, 0.35); }
+  .marker.hero-on { opacity: 0; } /* the featured flight is drawn as its plane instead */
+  /* The featured flight: its cutout, whole, over its pin. */
+  .hero { position: absolute; transform: translate(-50%, -50%); z-index: 500; pointer-events: none; display: none; }
+  .camera.wide .hero { transform: translate(-50%, -50%) scale(0.85); }
+  /* The wide shot, uncrowded: no pins in the terminal areas (they pile up round a hub there). */
+  .camera.wide .marker.near { display: none; }
+  /* The featured airline's pins only: everyone else's are off the board for the shot. */
+  .marker.ghost { display: none; }
+  .camera.wide svg.arcs path:first-child { stroke-width: 2.6; }
+  .camera.wide svg.arcs path:last-child { stroke-width: 1.3; }
+  /* Everything over the board lets clicks through to the planes. */
+  .light, .scan, canvas.cg, canvas.crawl, canvas.card { pointer-events: none; }
+  .arcs, .markers { transition: none; }
+  .camera.weather svg.arcs, .camera.weather .markers { opacity: 0.16; }
+  .wx { display: none; position: absolute; inset: 0; }
+  .camera.weather .wx { display: block; }
+  .wx .magnet { position: absolute; display: flex; align-items: center; gap: 4px;
+    filter: drop-shadow(2px 0 0 #f4eee0) drop-shadow(-2px 0 0 #f4eee0) drop-shadow(0 2px 0 #f4eee0) drop-shadow(0 -2px 0 #f4eee0)
+            drop-shadow(3px 4px 1.5px rgba(20, 15, 10, 0.5)); }
+  .wx .magnet svg { width: 64px; height: 64px; }
+  .wx .temp { font: 30px/1 CG, sans-serif; color: #1d1a16; background: #f7f0de; padding: 5px 7px 2px; border-radius: 3px; }
+  .light { position: absolute; inset: 0; mix-blend-mode: multiply; pointer-events: none;
+    background: radial-gradient(ellipse 80% 75% at 46% 44%, #fffdf8 0%, #fbf1e1 50%, #c3a482 100%); }
+  canvas.cg { position: absolute; inset: 0; width: 1440px; height: 1080px; image-rendering: pixelated; filter: url(#key); }
+  /* The crawl, the only thing that moves every frame, on a strip of its own: the key filter reruns on it alone. */
+  /* A break-in: a whole-frame card from the character generator, over the picture for a few seconds. */
+  canvas.card { position: absolute; inset: 0; width: 1440px; height: 1080px; image-rendering: pixelated; filter: url(#key); display: none; }
+  /* The plane-spotting card's plane, over the card, big. */
+  img.cardplane { position: absolute; left: 120px; top: 330px; width: 1200px; display: none; pointer-events: none;
+    filter: url(#tape) drop-shadow(10px 14px 6px rgba(10, 8, 30, 0.5)); }
+  canvas.crawl { position: absolute; left: 0; top: 1008px; width: 1440px; height: 60px; image-rendering: pixelated; filter: url(#key); }
+  .scan { position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.09) 0 1px, transparent 1px 3px); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="tape" x="0" y="0" width="100%" height="100%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="0.55" result="soft"/>
+    <feColorMatrix in="soft" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red"/>
+    <feOffset in="red" dx="2.5" result="redShift"/>
+    <feGaussianBlur in="redShift" stdDeviation="1.6" result="redBleed"/>
+    <feColorMatrix in="soft" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="gb"/>
+    <feComposite in="redBleed" in2="gb" operator="arithmetic" k1="0" k2="1" k3="1" k4="0"/>
+  </filter>
+  <filter id="key" x="-2%" y="-2%" width="104%" height="104%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.3 0.35" result="smear"/>
+    <feColorMatrix in="smear" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+    <feOffset in="r" dx="2" result="r2"/>
+    <feColorMatrix in="smear" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+    <feColorMatrix in="smear" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+    <feOffset in="b" dx="-1.5" result="b2"/>
+    <feComposite in="r2" in2="g" operator="arithmetic" k2="1" k3="1" result="rg"/>
+    <feComposite in="rg" in2="b2" operator="arithmetic" k2="1" k3="1" result="rgb"/>
+    <feGaussianBlur in="rgb" stdDeviation="3" result="glow"/>
+    <feComposite in="glow" in2="rgb" operator="arithmetic" k2="0.25" k3="1"/>
+  </filter>
+</svg>
+<div class="stage"><div class="frame">
+  <div class="lens"><div class="camera">
+    <img class="board" alt="">
+    <svg class="arcs" width="1440" height="1080"></svg>
+    <img class="board labels" alt="">
+    <div class="markers"></div>
+    <div class="wx"></div>
+  </div></div>
+  <div class="light"></div>
+  <canvas class="cg" width="480" height="360"></canvas>
+  <canvas class="crawl" width="480" height="20"></canvas>
+  <canvas class="card" width="480" height="360"></canvas>
+  <img class="cardplane" alt="">
+  <div class="scan"></div>
+</div></div>
+<script src="data.js"></script>
+<script src="sprites.js"></script>
+<script src="feed.js"></script>
+<script src="channel.js"></script>
+<script>
+  // A channel's board. Everything on it comes from the clock: the same moment gives every viewer the same
+  // flights, the same camera and the same lines of type. `?speed=60` runs the clock faster, `?t=…` starts it at a
+  // given moment (both for trying it out).
+  // A channel is a board: ?ch=1…5; without one, the viewer's own region (the set passes the channel it tunes).
+  const params = new URLSearchParams(location.search);
+  const DATA = window.BOARD;
+  // The channel to start on when none is asked for: the viewer's own region, by the time zone the browser reports.
+  function homeChannel() {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (/^America\/(Los_Angeles|Vancouver|Tijuana|Anchorage|Juneau|Sitka|Nome|Phoenix|Denver|Boise|Edmonton|Whitehorse)|^Pacific\/Honolulu/.test(tz)) return '3';
+    if (/^America\/(Chicago|Winnipeg|Menominee|North_Dakota|Indiana\/(Knox|Tell_City))/.test(tz)) return '2';
+    if (/^America\/(New_York|Detroit|Toronto|Indiana|Kentucky|Louisville)/.test(tz)) return '5';
+    return '1';
+  }
+  const CH = DATA.boards[params.get('ch')] ? params.get('ch') : homeChannel();
+  // "Across the country": the national board as a segment of an airline's channel (the set shows it now and then,
+  // ?host= naming the channel): that airline's whole network coast to coast. One wide shot, no break-ins of its own.
+  const HOST = params.get('host'), SEGMENT = !!HOST;
+  const BD = DATA.boards[CH];
+  const B = { board: { image: BD.image, labels: BD.labels, width: BD.width }, routes: BD.routes, airports: BD.airports, positions: DATA.positions, cities: DATA.cities, airlines: DATA.airlines };
+  document.title = `ghostflights · CH ${CH}`;
+
+  // The link to the set, the clock and the character generator (channel.js).
+  const { toSet, SPEED, START, now } = Channel;
+  const { block, text, finish } = Channel.cg;
+
+  const STEP = 4000; // a marker is moved every 4 seconds, by hand as it were
+  const CUT = 30000; // the director cuts every 30 seconds
+  const WEATHER_LEN = 12000; // the weather only the last 12 seconds of its slot; the shot before it runs on
+  const K = 1440 / B.board.width; // the board's pixels to the frame's
+  const INK = { NWA: '#b02822', RC1979: '#2858a0', WA1926: '#cc6028', EA1926: '#288cbe', PS1949: '#c43478', OZ1950: '#2e8048' };
+  // The wide shot and the weather; the hub cameras below.
+  const WIDE = { name: 'Cam A', scale: 1, x: 720, y: 540 };
+  const WEATHER = { name: 'Weather', scale: 1, x: 720, y: 540, weather: true };
+  // The hub cameras (build_sim.py picks them): an airline at one of its hubs, pulled back far enough to show the
+  // spokes as its route map did. Only that airline is on the board while the camera's on it.
+  const CLOSE = BD.cameras.map(([code, airline], i) => ({
+    letter: String.fromCharCode(66 + i), code, airline, scale: BD.hubScale,
+    // Centered on the airport, but never so near the board's edge that the shot runs off it.
+    x: Math.min(Math.max(B.airports[code][0] * K, 720 / BD.hubScale), 1440 - 720 / BD.hubScale),
+    y: Math.min(Math.max(B.airports[code][1] * K, 540 / BD.hubScale), 1080 - 540 / BD.hubScale),
+  }));
+  // The close cameras in the order they come up: the hubs (weight 2) twice as often, spread through the round.
+  const CLOSE_ORDER = (() => {
+    const order = [];
+    const weights = BD.cameras.map(([, , w]) => w); // [airport, airline, weight]
+    for (let round = 0; round < Math.max(...weights, 1); round++) weights.forEach((w, i) => { if (w > round) order.push(i); });
+    return order.length ? order : [-1];
+  })();
+  // The director's rotation, one shot per cut: wide, a close one, wide, a close one, wide, the weather; the close
+  // shots work through the board's airports. The weather is skipped when there's none to show.
+  function shotAt(n) {
+    if (n % 6 === 5) return WEATHER;
+    if (n % 2 === 0 || !CLOSE.length) return WIDE;
+    const k = Math.floor(n / 6) * 2 + (n % 6 === 1 ? 0 : 1);
+    return CLOSE[CLOSE_ORDER[k % CLOSE_ORDER.length]] || WIDE;
+  }
+
+  function hash(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+    return h >>> 0;
+  }
+  const bez = (r, u) => [0, 1].map((i) => ((1 - u) ** 2 * r.p0[i] + 2 * (1 - u) * u * r.c[i] + u * u * r.p1[i]) * K);
+  const city = (code) => (B.cities[code] || code);
+
+
+  // An airline with a real timetable flies it (feed.js, the one schedule engine): each flight on the days of the week it
+  // flew in the 1985 calendar, within its timetable's date notes; here, those whose route is on this board.
+  const routeByPair = new Map(B.routes.map((r) => [`${r.airline}:${[r.from, r.to].sort().join('-')}`, r]));
+  const SCHEDULE = Ghostflights.engine(DATA);
+  const noteDate = Ghostflights.noteDate;
+  function scheduledAt(t, out) {
+    for (const g of SCHEDULE.airborne(t)) {
+      const route = routeByPair.get(`${g.airline}:${[g.from, g.to].sort().join('-')}`);
+      if (!route) continue;
+      out.push({ ...g, fleet: B.airlines[g.airline].fleet[g.kind], route, u: route.from === g.from ? g.along : 1 - g.along, east: route.from === g.from });
+    }
+  }
+
+  // Every other route flies twice a day each way, at times drawn from the route and the day; what's in the air at `t`.
+  // What's in the air at t: every airline flies its real schedule (feed.js), none is made up.
+  function flightsAt(t) {
+    const out = [];
+    scheduledAt(t, out);
+    return out;
+  }
+
+  // Altitude in thousands of feet, the short way: 31K, climbing 18K, descending 9K.
+  const altK = (f) => (f.along < 0.12 ? `climbing ${Math.round(f.alt / 1000)}K` : f.along > 0.85 ? `descending ${Math.round(f.alt / 1000)}K` : `${Math.round(f.cruise / 1000)}K`);
+  const phase = (f) =>
+    f.along < 0.12 ? `Climbing through ${f.alt.toLocaleString()}` : f.along > 0.85 ? `Descending through ${f.alt.toLocaleString()}` : `At ${f.cruise.toLocaleString()}`;
+  // An airline as the station says it: its own short name where it had one (PSA), else the name without "Air Lines".
+  const short = (f) => B.airlines[f.airline].short || B.airlines[f.airline].name.replace(/ Air ?lines$/i, '');
+
+  // The board.
+  const stage = document.querySelector('.stage');
+  const camera = document.querySelector('.camera');
+  // The board, decoded before the picture is shown (the set's snow lasts until then); tried again if it fails or
+  // stalls, so a channel never rolls in on an empty board.
+  const boardImg = document.querySelector('.board');
+  function loadBoard(tries = 3) {
+    boardImg.src = B.board.image + (tries < 3 ? `?try=${3 - tries}` : '');
+    const stalled = new Promise((_, no) => setTimeout(() => no(new Error('stalled')), 6000));
+    return Promise.race([boardImg.decode(), stalled]).catch((e) => (tries > 1 ? loadBoard(tries - 1) : Promise.reject(e)));
+  }
+  const boardReady = loadBoard();
+  document.querySelector('.board.labels').src = B.board.labels; // the cities, over the lines
+  const arcs = document.querySelector('svg.arcs');
+  const arcEls = new Map();
+  for (const r of B.routes) {
+    const d = `M${r.p0[0] * K},${r.p0[1] * K} Q${r.c[0] * K},${r.c[1] * K} ${r.p1[0] * K},${r.p1[1] * K}`;
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'arc');
+    g.innerHTML = `<path d="${d}" stroke="#f6eeda" stroke-width="4.6"/><path d="${d}" stroke="${INK[r.airline]}" stroke-width="2.3"/>`;
+    arcs.appendChild(g);
+    arcEls.set(`${r.airline}:${r.from}-${r.to}`, g);
+  }
+  // A pin's shade says which way it's going: leaving one of the airline's hubs it's a light shade of the ink, heading
+  // into one a dark shade, between two other cities the ink itself. A bank shows as a hub ringed in dark, then light.
+  const HUB_SET = new Set([BD.close, ...BD.cameras.map(([code]) => code)]);
+  function shade(hex, f) {
+    const k = HUB_SET.has(f.from) ? 0.42 : HUB_SET.has(f.to) ? -0.35 : 0;
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const mix = (c) => Math.round(k > 0 ? c + (255 - c) * k : c * (1 + k));
+    return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+  }
+  const markersEl = document.querySelector('.markers');
+  const markers = new Map();
+  let flights = [];
+  let lastStep = -1, lastCam = -1;
+
+  function fit() {
+    const s = Math.min(innerWidth / 1440, innerHeight / 1080);
+    stage.style.transform = `scale(${s}) translate(-720px, -540px)`;
+  }
+  addEventListener('resize', fit);
+  fit();
+
+  // Every step: where everything is, which arcs are lit, and the markers moved.
+  // The airline a wide shot features (null on the other shots): its routes and planes drawn whole, the rest faint.
+  let focus = null;
+  function paintArcs() {
+    const live = new Set(flights.map((f) => `${f.airline}:${f.route.from}-${f.route.to}`));
+    // With an airline featured: its routes as its route map drew them (those flying now strongest), no one else's.
+    for (const [key, el] of arcEls) {
+      if (!focus) el.style.opacity = live.has(key) ? 1 : 0.035;
+      else el.style.opacity = key.startsWith(`${focus}:`) ? (live.has(key) ? 1 : 0.3) : 0;
+    }
+    for (const [key, m] of markers) m.classList.toggle('ghost', !!focus && !key.startsWith(`${focus}:`));
+  }
+  function step(t) {
+    flights = flightsAt(t);
+    const seen = new Set();
+    for (const f of flights) {
+      seen.add(f.key);
+      let m = markers.get(f.key);
+      if (!m) {
+        m = document.createElement('div');
+        m.className = 'marker';
+        m.style.setProperty('--ink', shade(INK[f.airline] || '#555555', f));
+        markersEl.appendChild(m);
+        markers.set(f.key, m);
+      }
+      const [x, y] = bez(f.route, f.u);
+      const [x2, y2] = bez(f.route, Math.min(Math.max(f.u + (f.east ? 0.01 : -0.01), 0), 1));
+      m.style.setProperty('--hdg', `${Math.atan2(y2 - y, x2 - x) * 180 / Math.PI}deg`);
+      m.style.left = x + 'px';
+      m.style.top = y + 'px';
+      m.dataset.key = f.key;
+      m.classList.toggle('near', nearField(f));
+    }
+    for (const [key, m] of markers) if (!seen.has(key)) { m.remove(); markers.delete(key); }
+    paintArcs();
+  }
+
+  function aim(cam) {
+    camera.classList.toggle('wide', cam.scale === 1);
+    camera.style.setProperty('--inv', cam.scale === 1 ? 1 : 1.25 / cam.scale); // pins a touch bigger on a close shot
+    camera.classList.toggle('weather', !!cam.weather);
+    camera.style.transform = `translate(${720 - cam.x * cam.scale}px, ${540 - cam.y * cam.scale}px) scale(${cam.scale})`;
+    return cam;
+  }
+  // Each wide shot features one airline, in turn through those flying on this board right now (the busiest first).
+  function cut(n) {
+    let cam = shotAt(n);
+    if (cam.weather && !weather) cam = WIDE;
+    if (SEGMENT) { focus = BD.airline || null; paintArcs(); return aim(WIDE); } // the airline, coast to coast
+    focus = BD.airline || null; // an airline's channel features it always
+    if (cam.airline && BD.airline) {
+      cam = { ...cam, name: `Cam ${cam.letter} · ${city(cam.code)}` };
+    } else if (cam.airline) {
+      focus = cam.airline;
+      cam = { ...cam, name: `Cam ${cam.letter} · ${short({ airline: focus })} · ${city(cam.code)}` };
+    } else if (cam === WIDE && !BD.airline) {
+      const count = {};
+      for (const f of flights) if (onScreen(f, WIDE)) count[f.airline] = (count[f.airline] || 0) + 1;
+      const order = Object.keys(count).sort((a, b) => count[b] - count[a] || a.localeCompare(b));
+      if (order.length > 1) {
+        focus = order[Math.floor(n / 2) % order.length];
+        cam = { ...WIDE, name: `Cam A · ${short({ airline: focus })}` };
+      }
+    }
+    paintArcs();
+    return aim(cam);
+  }
+
+  // Tuning in to a plane: a click features it (the lower third and the pointer stay on it) and a close camera follows
+  // it, reframing like an operator whenever it drifts toward the edge; a second click turns the caption to its source.
+  // It lets go when the plane lands (the caption says so for a moment), on Esc, or on a click on the empty board.
+  let picked = null, following = null, lastPicked = null, landed = null;
+  function pick(key) { picked = key; following = null; landed = null; }
+  window.picked = () => picked; // read-only, for tests
+  window.flightsNow = () => flights;
+  function letGo() { if (picked) { picked = null; following = null; lastCam = -1; } }
+  addEventListener('click', (e) => {
+    // A click on the caption turns it over.
+    // Planes stacked under the click: the first, or the next after the one already picked (so each click goes one
+    // further down the pile).
+    const under = document.elementsFromPoint(e.clientX, e.clientY).filter((el) => el.classList.contains('marker')).map((m) => m.dataset.key);
+    if (!under.length) return letGo();
+    const i = under.indexOf(picked);
+    if (i === -1) pick(under[0]);
+    else if (under.length > 1) pick(under[(i + 1) % under.length]);
+  });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') letGo(); });
+  function follow(f) {
+    const [x, y] = bez(f.route, f.u);
+    const s = BD.closeScale;
+    if (following) {
+      const sx = (x - following.x) * s + 720, sy = (y - following.y) * s + 540;
+      if (sx > 360 && sx < 1080 && sy > 270 && sy < 810) return following;
+    }
+    following = aim({
+      name: `Following flight ${f.number}`, scale: s,
+      x: Math.min(Math.max(x, 720 / s), 1440 - 720 / s), y: Math.min(Math.max(y, 540 / s), 1080 - 540 / s),
+    });
+    return following;
+  }
+
+  // The character generator, at its own resolution, every pixel on or off.
+  const cg = document.querySelector('canvas.cg');
+  const cgCtx = cg.getContext('2d', { willReadFrequently: true });
+  const crawlCtx = document.querySelector('canvas.crawl').getContext('2d', { willReadFrequently: true });
+  let ctx = Channel.cg.use(cgCtx); // the canvas block() and text() draw on, set with draw()
+  const draw = (c) => (ctx = Channel.cg.use(c));
+  const { WHITE, AMBER, BAND } = Channel.cg, CRAWL = Channel.cg.DEEP;
+  const clock = new Intl.DateTimeFormat('en-US', { timeZone: BD.tz, hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+
+  // The broadcast is set in 1985: the weather is this hour on this date in 1985, from Open-Meteo's archive of the
+  // ERA5 reanalysis (CC BY 4.0), at the board's bigger cities. Real history, said plainly. Without it there's no
+  // weather segment: it's never made up.
+  const YEAR = 1985;
+  const WX_CITIES = BD.weather;
+  const days = {}; // a 1985 date's hours, by city, once fetched
+  let weather = null, weatherHour = '';
+  // The board's own clock (Central): its date and hour are the ones looked up in 1985.
+  const local = new Intl.DateTimeFormat('en-US', { timeZone: BD.tz, month: 'numeric', day: 'numeric', hour: 'numeric', hourCycle: 'h23' });
+  const localParts = (t) => Object.fromEntries(local.formatToParts(new Date(t)).map((p) => [p.type, +p.value]));
+  const thenDate = (t) => {
+    const { month, day } = localParts(t);
+    return `${YEAR}-${String(month).padStart(2, '0')}-${String(Math.min(day, month === 2 ? 28 : 31)).padStart(2, '0')}`;
+  };
+  async function loadWeather(t) {
+    const date = thenDate(t);
+    if (days[date]) return;
+    days[date] = 'loading';
+    try {
+      const lat = WX_CITIES.map((c) => B.positions[c][0]).join(), lon = WX_CITIES.map((c) => B.positions[c][1]).join();
+      const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&hourly=temperature_2m,weather_code,is_day&temperature_unit=fahrenheit&timezone=${encodeURIComponent(BD.tz)}`);
+      if (!r.ok) throw new Error(r.status);
+      days[date] = (await r.json()).map((c) => c.hourly);
+    } catch {
+      delete days[date]; // tried again at the next step
+    }
+  }
+  // This hour's conditions (the board's hour on the 1985 date), and the magnets moved when the hour changes.
+  function updateWeather(t) {
+    const date = thenDate(t), hours = days[date];
+    if (!hours || hours === 'loading') { loadWeather(t); return; }
+    const h = localParts(t).hour;
+    if (`${date}T${h}` === weatherHour) return;
+    weatherHour = `${date}T${h}`;
+    weather = WX_CITIES.map((code, i) => ({ code, temp: Math.round(hours[i].temperature_2m[h]), sky: sky(hours[i].weather_code[h], hours[i].is_day[h]) }));
+    placeMagnets();
+  }
+  const thenLabel = (t) => new Date(`${thenDate(t)}T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+
+  // WMO weather codes to the magnets a station would have had.
+  function sky(code, day) {
+    if (code === 0 || code === 1) return day ? 'sun' : 'moon';
+    if (code === 2) return day ? 'partly' : 'cloud';
+    if (code === 3) return 'cloud';
+    if (code === 45 || code === 48) return 'fog';
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
+    if (code >= 95) return 'storm';
+    if (code >= 51) return 'rain';
+    return 'cloud';
+  }
+  const SKY_WORDS = { sun: 'clear', moon: 'clear', partly: 'partly cloudy', cloud: 'cloudy', fog: 'fog', snow: 'snow', storm: 'thunderstorms', rain: 'rain' };
+
+  // The magnets, our own: simple period shapes in flat paint.
+  const CLOUD = '<path d="M14 44 a12 12 0 0 1 4-23 a16 16 0 0 1 30-2 a11 11 0 0 1 4 25 z" fill="#fbfaf6" stroke="#9aa3ad" stroke-width="2"/>';
+  const ICON = {
+    sun: '<g fill="#f6c21c" stroke="#d08a10" stroke-width="2"><circle cx="32" cy="32" r="13"/>' +
+      [...Array(8)].map((_, i) => `<path transform="rotate(${i * 45} 32 32)" d="M29 3 h6 l-3 11 z"/>`).join('') + '</g>',
+    moon: '<path d="M40 8 a24 24 0 1 0 14 34 a19 19 0 1 1 -14 -34 z" fill="#f3e6a6" stroke="#b9a253" stroke-width="2"/>',
+    partly: '<g transform="translate(26 -14) scale(0.72)"><g fill="#f6c21c" stroke="#d08a10" stroke-width="2.5"><circle cx="32" cy="32" r="13"/>' +
+      [...Array(8)].map((_, i) => `<path transform="rotate(${i * 45} 32 32)" d="M29 3 h6 l-3 11 z"/>`).join('') + '</g></g>' + CLOUD,
+    cloud: CLOUD,
+    fog: CLOUD + '<g stroke="#9aa3ad" stroke-width="3" stroke-linecap="round"><path d="M12 52 h40"/><path d="M18 59 h30"/></g>',
+    rain: CLOUD + '<g fill="#2f74c0">' + [16, 30, 44].map((x) => `<path d="M${x} 48 q-4 7 0 9 q4 -2 0 -9 z"/>`).join('') + '</g>',
+    snow: CLOUD + '<g stroke="#3f86c9" stroke-width="2.5" stroke-linecap="round">' +
+      [18, 34, 48].map((x) => `<path d="M${x} 49 v10 M${x - 4} 52 l8 4 M${x + 4} 52 l-8 4"/>`).join('') + '</g>',
+    storm: CLOUD + '<path d="M30 44 l-6 11 h7 l-4 9 l12 -13 h-7 l5 -7 z" fill="#f6c21c" stroke="#a8740c" stroke-width="1.5"/>',
+  };
+
+  function placeMagnets() {
+    const wx = document.querySelector('.wx');
+    wx.innerHTML = '';
+    const placed = [];
+    for (const w of weather) {
+      const [x, y] = B.airports[w.code].map((v) => v * K);
+      const m = document.createElement('div');
+      m.className = 'magnet';
+      // Beside the city's dot, clear of its name and of the magnets already up: above left, above right, below
+      // left, below right, in that order.
+      const W = 124, H = 66;
+      const spots = [[x - 70, y - 66], [x + 4, y - 72], [x - 70, y + 8], [x + 10, y + 8]];
+      const [left, top] = spots.find(([l, tp]) => !placed.some(([pl, pt]) => l < pl + W && pl < l + W && tp < pt + H && pt < tp + H)) || spots[0];
+      placed.push([left, top]);
+      m.style.left = left + 'px';
+      m.style.top = top + 'px';
+      m.innerHTML = `<svg viewBox="0 0 64 64">${ICON[w.sky]}</svg><span class="temp">${w.temp}°</span>`;
+      wx.appendChild(m);
+    }
+  }
+
+  // The terminal area: the first and last tenth of a flight, where it's near its airports.
+  const nearField = (f) => f.along < 0.1 || f.along > 0.9;
+  function onScreen(f, cam) {
+    if (cam.scale === 1 && nearField(f)) return false; // hidden on the wide shot
+    const [x, y] = bez(f.route, f.u);
+    const sx = (x - cam.x) * cam.scale + 720, sy = (y - cam.y) * cam.scale + 540;
+    return sx > 80 && sx < 1360 && sy > 120 && sy < 980;
+  }
+
+  // The featured flight drawn as its plane, the cutout facing the way it flies, over its pin (hidden meanwhile).
+  const hero = document.createElement('img');
+  hero.className = 'hero';
+  document.querySelector('.markers').appendChild(hero);
+  let heroKey = null;
+  function showHero(f) {
+    if (heroKey && heroKey !== (f && f.key) && markers.get(heroKey)) markers.get(heroKey).classList.remove('hero-on');
+    heroKey = f ? f.key : null;
+    if (!f) { hero.style.display = 'none'; return; }
+    const [x, y] = bez(f.route, f.u);
+    const [x2] = bez(f.route, Math.min(Math.max(f.u + (f.east ? 0.01 : -0.01), 0), 1));
+    const src = baked.get(`sprites/${f.fleet.sprite}-${x2 >= x ? 'right' : 'left'}.svg`);
+    if (hero.src !== src) hero.src = src;
+    hero.style.width = `${1.5 * ({ B747: 128, DC10: 118, L101: 118, A30B: 112, B752: 100, B462: 82, CV580: 80 }[f.kind] || 94)}px`; // by length, roughly, and large
+    hero.style.left = `${x}px`; hero.style.top = `${y}px`; hero.style.display = 'block';
+    if (markers.get(f.key)) markers.get(f.key).classList.add('hero-on');
+  }
+
+  let shownKey = '';
+  // The crawl leads: it lists the flights in this shot, and the one passing its reading point (a third of the way
+  // across) is the one featured, its words in yellow and its plane drawn large on the board under the pointer. Each
+  // shot starts the crawl fresh with its own flights. A plane clicked is the crawl's alone, its details and source;
+  // landed, the crawl says so. During the weather, the cities' conditions.
+  const READ_X = 150, CRAWL_SPEED = 26; // the character generator's pixels, and its pixels a second (an unhurried read)
+  let crawl = { for: '', items: [], start: 0, widths: [], total: 0 };
+  function crawlItems(t, cam, weatherUp, pf, arrived) {
+    if (weatherUp) return [{ text: `${thenLabel(t)}   •   ` + weather.map((w) => `${city(w.code)} ${w.temp} ${SKY_WORDS[w.sky]}`).join('   •   ') + '   •   Weather of 1985 by Open-Meteo.com from ERA5' }];
+    const who = (g) => `${short(g)} ${g.number}`;
+    if (arrived) return [{ key: arrived.key, text: `${who(arrived)} from ${city(arrived.from)} has landed at ${city(arrived.to)}`, lit: true }];
+    if (pf) {
+      const source = B.airlines[pf.airline].source;
+      return [{ key: pf.key, lit: true, text: `${who(pf)} · ${pf.fleet.name} · ${city(pf.from)} to ${city(pf.to)} · ${phase(pf).toLowerCase()} · ` +
+        `from the ${source}. Times as printed, the flight simulated` }];
+    }
+    const here = flights.filter((g) => onScreen(g, cam) && (!focus || g.airline === focus)).sort((x, y) => x.key.localeCompare(y.key));
+    // On an airline's channel its name goes without saying: the flight, its type, the route and its altitude.
+    const line = (g) => (BD.airline
+      ? `Flt ${g.number} · ${g.fleet.name} · ${city(g.from)}–${city(g.to)} · ${altK(g)}`
+      : `${who(g)} ${g.fleet.name} ${city(g.from)}–${city(g.to)} ${altK(g)}`);
+    return here.length ? here.map((g) => ({ key: g.key, text: line(g) })) : [{ text: 'A quiet sky on the board' }];
+  }
+  // Where the crawl's first item is now: at the reading point when the shot begins, so a flight is featured at once,
+  // then moving left and coming round again.
+  const crawlX = (t) => 480 - (((t - crawl.start) / 1000 / SPEED * CRAWL_SPEED + 480 - READ_X) % (crawl.total + 480));
+  // Which item is at the reading point now.
+  function crawlActive(t) {
+    if (!crawl.items.length || crawl.items[0].lit) return crawl.items[0] && crawl.items[0].key;
+    let x = crawlX(t);
+    for (let i = 0; i < crawl.items.length; i++) {
+      if (READ_X >= x && READ_X < x + crawl.widths[i]) return crawl.items[i].key;
+      x += crawl.widths[i];
+    }
+    return null;
+  }
+
+  function drawCG(t, cam, pf, arrived) {
+    const weatherUp = cam.weather && weather;
+    const which = `${lastCam}|${cam.name}|${weatherUp ? weatherHour : ''}|${pf ? pf.key : ''}|${arrived ? arrived.key : ''}`;
+    if (crawl.for !== which) {
+      const items = crawlItems(t, cam, weatherUp, pf, arrived);
+      draw(crawlCtx); ctx.font = '12px CG';
+      const widths = items.map((it) => ctx.measureText(`${it.text}   •   `.toUpperCase()).width);
+      crawl = { for: which, items, start: t, widths, total: widths.reduce((s, w) => s + w, 0) };
+    }
+    const activeKey = crawlActive(t);
+    const f = (activeKey && flights.find((g) => g.key === activeKey)) || null;
+    const titled = weatherUp && (t % CUT) - (CUT - WEATHER_LEN) < 6000;
+    const key = [cam.name, clock.format(new Date(t)), f ? `${f.key}|${lastStep}` : '', weatherUp ? `${weatherHour}|${titled}` : '', cam.x, cam.y].join('/');
+    if (key !== shownKey) {
+      shownKey = key;
+      draw(cgCtx);
+      ctx.clearRect(0, 0, 480, 360);
+      // The bug, in the board's emptier top corner (build_sim.py picks it).
+      const [bx, ba] = BD.bug === 'left' ? [24, 'left'] : [456, 'right'];
+      text('Ghostflights', bx, 33, 12, AMBER, ba);
+      text(SEGMENT ? `CH ${HOST} · ${DATA.boards[HOST].name} · ${BD.name}` : `CH ${CH} · ${BD.name} · ${cam.name}`, bx, 48, 14, WHITE, ba);
+      text(clock.format(new Date(t)), bx, 62, 14, WHITE, ba);
+      if (weatherUp && titled) drawWeatherTitle(t);
+      showHero(weatherUp || arrived ? null : f);
+      if (f && !weatherUp && !arrived) {
+        // A keyed pointer over the featured plane, as a station would put one up.
+        const [x, y] = bez(f.route, f.u);
+        const px = ((x - cam.x) * cam.scale + 720) / 3, py = ((y - cam.y) * cam.scale + 540) / 3 - (cam.scale === 1 ? 7 : 9 * cam.scale);
+        ctx.beginPath();
+        ctx.moveTo(px - 5, py - 7); ctx.lineTo(px + 5, py - 7); ctx.lineTo(px, py); ctx.closePath();
+        ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
+        ctx.fillStyle = AMBER; ctx.fill();
+      }
+      finish(cgCtx);
+    }
+    drawCrawl(t, activeKey);
+  }
+
+
+  // The crawl, moving left at a steady 40 of its pixels a second: this board's flights, or during the weather the
+  // cities' conditions.
+  function drawCrawl(t, activeKey) {
+    draw(crawlCtx);
+    ctx.clearRect(0, 0, 480, 20);
+    block(0, 0, 480, 18, CRAWL);
+    block(0, 0, 480, 1, AMBER);
+    const lit = crawl.items.length && crawl.items[0].lit;
+    let x = crawlX(t);
+    crawl.items.forEach((it, i) => {
+      if (x < 480 && x + crawl.widths[i] > 0) text(`${it.text}   •   `, x, 14, 12, lit || (it.key && it.key === activeKey) ? AMBER : WHITE);
+      x += crawl.widths[i];
+    });
+    finish(crawlCtx);
+  }
+
+
+  function drawWeatherTitle(t) {
+    const home = weather.find((w) => w.code === BD.close) || weather[0];
+    const worst = weather.find((w) => w.sky === 'storm') || weather.find((w) => w.sky === 'snow') || weather.find((w) => w.sky === 'rain');
+    block(24, 278, 330, 50, BAND);
+    block(24, 278, 330, 2, AMBER);
+    text(`${BD.name} weather`, 32, 298, 17, WHITE);
+    text(`This hour on ${thenLabel(t)}`, 32, 312, 11, AMBER);
+    const said = worst ? `${SKY_WORDS[worst.sky]} at ${city(worst.code)}` : `${SKY_WORDS[home.sky]} across the region`;
+    const line = worst && worst.code === home.code ? `${said}, ${home.temp} degrees.` : `${said}. ${home.temp} at ${city(home.code)}.`;
+    text(line[0].toUpperCase() + line.slice(1), 32, 324, 10, WHITE);
+  }
+
+
+  // Each cutout baked once: the drawing, a white die-cut border, the printed cut line outside it and the key light's
+  // shadow. Twice: small for the map's markers (sharp still on a close camera, light for a board of 150 of them) and
+  // large for the caption's card and the plane-spotting break. Kept as image files in memory (blob URLs), not text.
+  const baked = new Map(), bakedBig = new Map();
+  function cutout(img, W) {
+    const k = W / 300, H = Math.round(W * img.naturalHeight / img.naturalWidth), pad = 18 * k;
+    const silhouette = (color) => {
+      const c = document.createElement('canvas');
+      c.width = W + pad * 2; c.height = H + pad * 2;
+      const g = c.getContext('2d');
+      g.drawImage(img, pad, pad, W, H);
+      g.globalCompositeOperation = 'source-in';
+      g.fillStyle = color;
+      g.fillRect(0, 0, c.width, c.height);
+      return c;
+    };
+    const ring = document.createElement('canvas');
+    ring.width = W + pad * 2; ring.height = H + pad * 2;
+    const r = ring.getContext('2d');
+    for (const [color, radius] of [['#2a2118', 12 * k], ['#fbf8f0', 6 * k]]) { // a bold dark cut line: white planes need an edge on the paper
+      const sil = silhouette(color);
+      for (let a = 0; a < 16; a++) r.drawImage(sil, Math.cos(a * Math.PI / 8) * radius, Math.sin(a * Math.PI / 8) * radius);
+    }
+    const out = document.createElement('canvas');
+    out.width = ring.width + 14 * k; out.height = ring.height + 16 * k;
+    const o = out.getContext('2d');
+    o.shadowColor = 'rgba(20, 15, 10, 0.62)'; o.shadowOffsetX = 9 * k; o.shadowOffsetY = 12 * k; o.shadowBlur = 5 * k;
+    o.drawImage(ring, 0, 0);
+    o.shadowColor = 'transparent';
+    o.drawImage(img, pad, pad, W, H);
+    return new Promise((done) => out.toBlob((blob) => done(URL.createObjectURL(blob))));
+  }
+  // The small ones before the picture starts; the large ones after, in the background (the card falls back to the
+  // small one until its large one is ready).
+  const drawings = new Map();
+  async function bake(src) {
+    const img = new Image();
+    img.src = window.SPRITES[src]; // a small WebP from the data (sprites.js), so the canvas stays readable
+    await img.decode();
+    drawings.set(src, img);
+    baked.set(src, await cutout(img, 260));
+  }
+  const big = (src) => bakedBig.get(src) || baked.get(src);
+  async function bakeBig(srcs) {
+    for (const src of srcs) if (drawings.has(src)) bakedBig.set(src, await cutout(drawings.get(src), 600));
+  }
+
+  let cam = WIDE;
+  // Break-ins: every six minutes the station interrupts itself for eight seconds with a card. The station's ID at the
+  // top and bottom of the hour (with a chime from the set), and otherwise the time, what's coming up, a word from an
+  // invented 1985 sponsor, a message from the station, now and then a "please stand by". Decided by the clock, so every
+  // viewer sees the same card; skipped while the viewer follows a plane.
+  const BREAK = 6 * 60000, BREAK_LEN = 8000;
+  // Invented businesses only, never a real one; phone numbers in 555-0100 to 0199, the range kept for fiction.
+  const SPONSORS = [
+    { name: 'The Runway Inn', lines: ['Free airport shuttle every half hour.', 'Color TV in every room. Heated pool.'], phone: '555-0142', bg: '#5a1f1a', ink: '#ffd9a0' },
+    { name: 'Altitude Travel', lines: ['Ask us about Super Saver fares.', 'We book every airline. Even the little ones.'], phone: '555-0117', bg: '#123c5a', ink: '#bfe6ff' },
+    { name: 'Carousel Luggage', lines: ['Hardside or soft.', 'Built to survive the baggage carousel.'], phone: '555-0186', bg: '#3b2a52', ink: '#f2d4ff' },
+    { name: 'Holding Pattern Lounge', lines: ['Cocktails while you wait.', 'Concourse B. Open till the last departure.'], phone: '555-0163', bg: '#173f2c', ink: '#c8f2d6' },
+    { name: 'Tailwind Rent-a-Car', lines: ['Free mileage on weekends.', 'Pick up right outside baggage claim.'], phone: '555-0128', bg: '#5b3b0c', ink: '#ffe3a6' },
+    { name: 'Flight Deck Video', lines: ['VHS and Beta.', 'Rent two movies, the third one is free.'], phone: '555-0151', bg: '#3a1838', ink: '#ffc4ee' },
+    { name: 'Clear Skies Opticians', lines: ['Aviator frames in every size.', 'Glasses in about an hour.'], phone: '555-0109', bg: '#1d3a4a', ink: '#d2f0ff' },
+    { name: 'Jet Lag Mattress Outlet', lines: ['Sleep like you never left.', 'Free delivery across the metro area.'], phone: '555-0194', bg: '#2b2f5c', ink: '#d6dcff' },
+  ];
+  const MESSAGES = [
+    ['Fasten your seat belt.', 'In the car too.'],
+    ['Smoking is permitted in designated rows only.', 'Please check with your flight attendant.'],
+    ['Arrive one hour before departure.', 'Two if you are flying overseas.'],
+    ['Have you called your mother lately?', 'Long distance rates are lower after 11.'],
+    ['Keep your boarding pass handy.', 'It saves everyone a little time.'],
+  ];
+  function breakAt(t) {
+    if (SEGMENT || picked || t % BREAK >= BREAK_LEN) return null;
+    const n = Math.floor(t / BREAK), minute = Math.floor((t % 3600000) / 60000);
+    if (minute < 6 || (minute >= 30 && minute < 36)) return { n, kind: 'id' };
+    const h = hash(`break:${n}`);
+    if (h % 23 === 0) return { n, kind: 'standby' };
+    return { n, kind: ['time', 'sponsor', 'plane', 'sponsor', 'message', 'next', 'sponsor', 'plane'][h % 8], pick: h >>> 3 };
+  }
+  // The coming hour's busiest airport on this board (well inside it), from the real schedules.
+  function busiestNextHour(t) {
+    const from = (Math.floor(t / 3600000) + 1) * 3600000, count = {};
+    const inside = (c) => { const p = B.airports[c]; return p && p[0] > 0.08 * BD.width && p[0] < 0.92 * BD.width && p[1] > 0.08 * BD.height && p[1] < 0.92 * BD.height; };
+    for (const g of SCHEDULE.departures(from, from + 3600000, inside)) count[g.origin] = (count[g.origin] || 0) + 1;
+    const best = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
+    return best && { code: best[0], n: best[1], hour: from };
+  }
+
+  const cardEl = document.querySelector('canvas.card'), cardPlane = document.querySelector('img.cardplane');
+  const cardCtx = cardEl.getContext('2d', { willReadFrequently: true });
+  let cardFor = '';
+  function drawBreak(t, br) {
+    const key = br ? `${br.n}:${br.kind}` : '';
+    if (key === cardFor) return !!br;
+    cardFor = key;
+    cardEl.style.display = br ? 'block' : 'none';
+    cardPlane.style.display = br && br.kind === 'plane' ? 'block' : 'none';
+    if (!br) return false;
+    draw(cardCtx);
+    ctx.clearRect(0, 0, 480, 360);
+    const zone = new Intl.DateTimeFormat('en-US', { timeZone: BD.tz, timeZoneName: 'long' }).formatToParts(new Date(t)).find((p) => p.type === 'timeZoneName').value.replace(/ Standard Time| Daylight Time/, '');
+    const hm = new Intl.DateTimeFormat('en-US', { timeZone: BD.tz, hour: 'numeric', minute: '2-digit' }).format(new Date(t));
+    if (br.kind === 'id') {
+      block(0, 0, 480, 360, BAND);
+      // The hub starburst of the boards: arcs out of one point, in the station's amber.
+      ctx.strokeStyle = AMBER; ctx.lineWidth = 2;
+      for (let i = 0; i < 10; i++) {
+        const side = i % 2 ? 1 : -1, reach = 70 + Math.floor(i / 2) * 38, rise = 18 + (i * 7) % 40;
+        const ex = 240 + side * reach, ey = 252 - rise;
+        ctx.beginPath(); ctx.moveTo(240, 252);
+        ctx.quadraticCurveTo((240 + ex) / 2, Math.min(252, ey) - 26 - reach * 0.12, ex, ey);
+        ctx.stroke();
+      }
+      block(235, 247, 10, 10, AMBER);
+      text('Ghostflights', 240, 120, 44, WHITE, 'center');
+      text(`Channel ${CH} · ${BD.name}`, 240, 150, 16, AMBER, 'center');
+      text('Departed airlines on their 1985 schedules', 240, 290, 12, WHITE, 'center');
+      text('A Skyarium station', 240, 310, 11, AMBER, 'center');
+      toSet({ chime: true });
+    } else if (br.kind === 'time') {
+      block(0, 0, 480, 360, CRAWL);
+      text("It's", 240, 120, 18, AMBER, 'center');
+      text(hm, 240, 190, 72, WHITE, 'center');
+      text(`${zone} time`, 240, 222, 16, AMBER, 'center');
+      text(`You're watching Ghostflights. Channel ${CH}.`, 240, 280, 12, WHITE, 'center');
+    } else if (br.kind === 'next') {
+      const nx = busiestNextHour(t);
+      block(0, 0, 480, 360, BAND);
+      block(40, 96, 400, 3, AMBER);
+      text('Coming up on Ghostflights', 240, 84, 16, AMBER, 'center');
+      const at = new Intl.DateTimeFormat('en-US', { timeZone: BD.tz, hour: 'numeric' }).format(new Date(nx ? nx.hour : t));
+      const h24 = +new Intl.DateTimeFormat('en-US', { timeZone: BD.tz, hour: 'numeric', hourCycle: 'h23' }).format(new Date(nx ? nx.hour : t));
+      const part = h24 < 5 ? 'the night flights' : h24 < 12 ? 'the morning push' : h24 < 16 ? 'the afternoon bank' : h24 < 21 ? 'the evening push' : 'the late departures';
+      text(nx ? `At ${at}, ${part}` : 'A quiet hour on the board', 240, 160, 24, WHITE, 'center');
+      text(nx ? `out of ${city(nx.code)}` : 'Night flights only', 240, 196, 24, WHITE, 'center');
+      if (nx) text(`${nx.n} departures in the hour, as scheduled in 1985`, 240, 236, 12, AMBER, 'center');
+      text(`Channel ${CH} · ${BD.name}`, 240, 300, 12, WHITE, 'center');
+    } else if (br.kind === 'sponsor') {
+      const s = SPONSORS[(br.n * 3) % SPONSORS.length]; // in turn (three apart), so the same one doesn't come round soon
+      block(0, 0, 480, 360, s.bg);
+      text('This portion of Ghostflights is brought to you by', 240, 70, 11, WHITE, 'center');
+      block(60, 96, 360, 2, s.ink);
+      text(s.name, 240, 150, 34, s.ink, 'center');
+      block(60, 168, 360, 2, s.ink);
+      s.lines.forEach((l, i) => text(l, 240, 206 + i * 22, 15, WHITE, 'center'));
+      text(`Call ${s.phone}`, 240, 290, 18, s.ink, 'center');
+    } else if (br.kind === 'plane') {
+      // One of the types flying on this board now, its paint big: a different one each time, by turns.
+      const kinds = [];
+      for (const f of flights) if (onScreen(f, WIDE) && !kinds.some((k) => k.airline === f.airline && k.kind === f.kind)) kinds.push(f);
+      kinds.sort((a, b) => (a.airline + a.kind).localeCompare(b.airline + b.kind));
+      const f = kinds[br.pick % (kinds.length || 1)];
+      block(0, 0, 480, 360, BAND);
+      if (f) {
+        text('Spotted on Ghostflights', 240, 46, 13, AMBER, 'center');
+        text(short(f), 240, 84, 30, WHITE, 'center');
+        text(`${f.fleet.name} · ${f.fleet.scheme}`, 240, 104, 13, AMBER, 'center');
+        text(`Flight ${f.number}, ${city(f.from)} to ${city(f.to)}, in the air now`, 240, 326, 12, WHITE, 'center');
+        cardPlane.src = big(`sprites/${f.fleet.sprite}-left.svg`);
+      } else {
+        text('A quiet sky on this board', 240, 180, 20, WHITE, 'center');
+        cardPlane.style.display = 'none';
+      }
+    } else if (br.kind === 'message') {
+      const [a, b] = MESSAGES[br.pick % MESSAGES.length];
+      block(0, 0, 480, 360, '#000');
+      text('A message from Ghostflights', 240, 110, 12, AMBER, 'center');
+      text(a, 240, 180, 20, WHITE, 'center');
+      text(b, 240, 210, 20, WHITE, 'center');
+    } else {
+      // Please stand by: seven bars, then the words.
+      ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0'].forEach((c, i) => block(i * 480 / 7, 0, 480 / 7 + 1, 250, c));
+      block(0, 250, 480, 110, '#101010');
+      text('Please stand by', 240, 300, 26, WHITE, 'center');
+      text(`Channel ${CH}`, 240, 326, 12, AMBER, 'center');
+    }
+    finish(cardCtx);
+    return true;
+  }
+
+  function frame() {
+    const t = now();
+    const s = Math.floor(t / STEP);
+    if (s !== lastStep) { lastStep = s; step(s * STEP); updateWeather(t); }
+    // The weather's slot starts as the shot before it carried on, and cuts to the weather for its last seconds.
+    const slot = Math.floor(t / CUT), shortWeather = slot % 6 === 5 && t % CUT < CUT - WEATHER_LEN;
+    const c = shortWeather ? slot - 1 : slot;
+    const pf = picked && flights.find((g) => g.key === picked);
+    if (picked && !pf) { landed = { f: lastPicked, until: t + 6000 }; letGo(); }
+    if (pf) { lastPicked = pf; if (focus !== pf.airline) { focus = pf.airline; paintArcs(); } cam = follow(pf); }
+    else if (c !== lastCam) { lastCam = c; cam = cut(c); }
+    if (landed && t > landed.until) landed = null;
+    drawCG(t, cam, pf, landed && landed.f);
+    drawBreak(t, breakAt(t));
+  }
+
+  new FontFace('CG', `url(${window.CG_FONT})`).load().then(async (font) => {
+    document.fonts.add(font);
+    const sprites = Object.values(B.airlines).flatMap((a) => Object.values(a.fleet).flatMap((f) => [`sprites/${f.sprite}-left.svg`, `sprites/${f.sprite}-right.svg`]));
+    // A cutout that won't bake shows its plain drawing rather than stop the broadcast.
+    await Promise.all(sprites.map((src) => bake(src).catch(() => baked.set(src, window.SPRITES[src]))));
+    bakeBig(sprites.filter((s) => s.endsWith('-left.svg'))); // the card and the break only show the left side
+    await loadWeather(now());
+    updateWeather(now());
+    frame();
+    setInterval(frame, 50); // twenty frames a second is plenty for a character generator
+    await boardReady.catch(() => {}); // shown even so after three tries, rather than snow for ever
+    toSet({ ready: CH });
+  });
+
+</script>
+</body>
+</html>

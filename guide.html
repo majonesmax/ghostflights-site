@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ghostflights · The Guide</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  .stage { position: absolute; left: 50%; top: 50%; width: 1440px; height: 1080px; transform-origin: 0 0; }
+  .frame { position: relative; width: 1440px; height: 1080px; overflow: hidden;
+    background: linear-gradient(180deg, #1b2a6e 0%, #121c4f 42%, #0c1338 100%); filter: url(#tape); }
+  canvas { position: absolute; left: 0; width: 1440px; image-rendering: pixelated; filter: url(#key); }
+  canvas.still { top: 0; height: 1080px; }
+  canvas.listing { top: 498px; height: 519px; }
+  .light { position: absolute; inset: 0; mix-blend-mode: multiply; pointer-events: none;
+    background: radial-gradient(ellipse 80% 75% at 46% 44%, #ffffff 0%, #eef0ff 55%, #9aa0c4 100%); }
+  .scan { position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.12) 0 1px, transparent 1px 3px); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="tape" x="0" y="0" width="100%" height="100%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="0.55"/>
+  </filter>
+  <filter id="key" x="-2%" y="-2%" width="104%" height="104%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.3 0.35" result="smear"/>
+    <feColorMatrix in="smear" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+    <feOffset in="r" dx="2" result="r2"/>
+    <feColorMatrix in="smear" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+    <feColorMatrix in="smear" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+    <feOffset in="b" dx="-1.5" result="b2"/>
+    <feComposite in="r2" in2="g" operator="arithmetic" k2="1" k3="1" result="rg"/>
+    <feComposite in="rg" in2="b2" operator="arithmetic" k2="1" k3="1" result="rgb"/>
+    <feGaussianBlur in="rgb" stdDeviation="3" result="glow"/>
+    <feComposite in="glow" in2="rgb" operator="arithmetic" k2="0.25" k3="1"/>
+  </filter>
+</svg>
+<div class="stage"><div class="frame">
+  <canvas class="still" width="480" height="360"></canvas>
+  <canvas class="listing" width="480" height="173"></canvas>
+  <div class="light"></div>
+  <div class="scan"></div>
+</div></div>
+<script src="data.js"></script>
+<script src="feed.js"></script>
+<script src="channel.js"></script>
+<script>
+  // Channel 0, the guide: what's on each channel this hour from the real schedules, then what the station is, its
+  // sources and the set's knobs, scrolling up slowly like a cable guide channel. It runs inside the set (index.html).
+  const DATA = window.BOARD, DAY = 86400000, HOUR = 3600000;
+  // The link to the set, the clock and the character generator (channel.js).
+  const { toSet, START_REAL, now } = Channel;
+  const { block, text, wrap, finish, WHITE, AMBER, BAND, DEEP } = Channel.cg, QUIET = '#aeb6e0';
+  let ctx;
+  const draw = (c) => (ctx = Channel.cg.use(c));
+
+
+  const stage = document.querySelector('.stage');
+  function fit() {
+    const s = Math.min(innerWidth / 1440, innerHeight / 1080);
+    stage.style.transform = `scale(${s}) translate(-720px, -540px)`;
+  }
+  addEventListener('resize', fit);
+  fit();
+
+  // Departures in an hour from the airports on a channel's board, by the real schedules on the 1985 calendar (feed.js,
+  // the same engine the station flies by).
+  const SCHEDULE = Ghostflights.engine(DATA), then1985 = Ghostflights.then1985;
+  function departures(ch, from, to) {
+    const board = DATA.boards[ch], onBoard = board.airports, byAirport = {}, airlines = new Set();
+    // "Busiest" counts only airports well inside the board, not one at its edge.
+    const inside = ([x, y]) => x > 0.08 * board.width && x < 0.92 * board.width && y > 0.08 * board.height && y < 0.92 * board.height;
+    const all = SCHEDULE.departures(from, to, (c) => !!onBoard[c]).filter((g) => !board.airline || g.airline === board.airline);
+    for (const g of all) {
+      airlines.add(g.airline);
+      if (inside(onBoard[g.origin])) byAirport[g.origin] = (byAirport[g.origin] || 0) + 1;
+    }
+    const busiest = Object.entries(byAirport).sort((a, b) => b[1] - a[1])[0];
+    return { count: all.length, airlines: [...airlines], busiest: busiest && busiest[0] };
+  }
+
+
+  // The top: the station, the guide, the viewer's own time and today's date in 1985.
+  const still = document.querySelector('canvas.still');
+  const local = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+  const longDate = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  let stillKey = '';
+  function drawStill(t) {
+    const key = local.format(new Date(t));
+    if (key === stillKey) return;
+    stillKey = key;
+    draw(still.getContext('2d', { willReadFrequently: true }));
+    ctx.clearRect(0, 0, 480, 360);
+    text('Ghostflights', 24, 44, 14, AMBER);
+    text('The Guide', 24, 78, 34, WHITE);
+    text(local.format(new Date(t)), 456, 78, 34, WHITE, 'right');
+    text(longDate.format(new Date(then1985(Math.floor(t / DAY)))), 456, 98, 12, AMBER, 'right');
+    block(24, 112, 432, 2, AMBER);
+    text('Departed airlines on their 1985 schedules, all day.', 24, 132, 12, WHITE);
+    text('Turn the channel knob on the set. Or the arrows, or 0 to 6.', 24, 148, 11, QUIET);
+    finish(still);
+  }
+
+  // The listing: a row per channel, then the station's notes, drawn once an hour onto a tall strip that scrolls.
+  const CREDITS = [
+    ['About', 'Ghostflights is a TV station from 1985. Departed airlines fly their real schedules on painted route maps. The schedules are real and the flights are simulated.'],
+    ['Numbers', 'Flight numbers and times are as printed in each airline\'s timetable.'],
+    ['Northwest', 'System timetable of October 27 1985. Northwest Airlines History Center.'],
+    ['Republic', 'City schedules from 1984 to 1986. Northwest Airlines History Center.'],
+    ['Western', 'Official Airline Guide of February 15 1985 as transcribed at departedflights.com.'],
+    ['Weather', 'This hour on this date in 1985. Open-Meteo.com from the ERA5 archive.'],
+    ['Maps', 'Painted here from Natural Earth.'],
+    ['Planes', 'Painted from Open Liveries.'],
+    ['Knobs', 'Channel turns through 0 to 6. Volume turns the music on and off. M works too.'],
+    ['Data', 'The flights as a simulated feed for your own projects. ghostflights.tv/feed'],
+    ['Station', 'A Skyarium station. skyarium.app'],
+  ];
+  const ROW = 52;
+  const strip = document.createElement('canvas');
+  let stripHour = -1;
+  function drawStrip(t) {
+    const hour = Math.floor(t / HOUR);
+    if (hour === stripHour) return;
+    stripHour = hour;
+    const from = hour * HOUR;
+    strip.width = 480; strip.height = 2000;
+    draw(strip.getContext('2d', { willReadFrequently: true }));
+    let y = 0;
+    for (const ch of Object.keys(DATA.boards).filter((c) => /^\d+$/.test(c))) { // the channels, not the national segments' boards
+      const nowOn = departures(ch, from, from + HOUR), next = departures(ch, from + HOUR, from + 2 * HOUR);
+      block(24, y + 4, 432, ROW - 6, BAND);
+      block(24, y + 4, 54, ROW - 6, AMBER);
+      text(`CH ${ch}`, 51, y + 32, 16, DEEP, 'center');
+      text(DATA.boards[ch].name, 88, y + 20, 15, WHITE);
+      const names = nowOn.airlines.map((a) => DATA.airlines[a].short || DATA.airlines[a].name.replace(/ Air ?lines$/i, '').replace(' Orient', ''));
+      const what = nowOn.count
+        ? `${nowOn.count} departures this hour. Busiest ${DATA.cities[nowOn.busiest] || nowOn.busiest}.${DATA.boards[ch].airline ? '' : ` ${names.join(', ')}.`}`
+        : 'A quiet hour. Night flights only.';
+      text(what, 88, y + 34, 10, AMBER);
+      text(`Next hour ${next.count} departures. Weather every few minutes.`, 88, y + 45, 9, QUIET);
+      y += ROW;
+    }
+    y += 8;
+    for (const [label, words] of CREDITS) {
+      const lines = wrap(words, 10, 340);
+      const h = 14 + lines.length * 12;
+      block(24, y + 4, 432, h, DEEP);
+      text(label, 32, y + 17, 11, AMBER);
+      lines.forEach((l, i) => text(l, 108, y + 17 + i * 12, 10, WHITE));
+      y += h + 6;
+    }
+    strip.used = y + 40;
+    finish(strip);
+  }
+
+  // The strip scrolls up 16 of its pixels a second and comes round again.
+  const listing = document.querySelector('canvas.listing'), lctx = listing.getContext('2d');
+  function frame() {
+    const t = now();
+    drawStill(t);
+    drawStrip(t);
+    const y = ((Date.now() - START_REAL) / 1000 * 16) % strip.used;
+    lctx.clearRect(0, 0, 480, 173);
+    lctx.drawImage(strip, 0, -y);
+    if (strip.used - y < 173) lctx.drawImage(strip, 0, strip.used - y);
+  }
+
+  new FontFace('CG', `url(${window.CG_FONT})`).load().then((font) => {
+    document.fonts.add(font);
+    frame();
+    setInterval(frame, 50);
+    toSet({ ready: '0' });
+  });
+</script>
+</body>
+</html>
