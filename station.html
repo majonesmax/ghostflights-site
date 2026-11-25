@@ -99,6 +99,7 @@
 <script src="sprites.js"></script>
 <script src="feed.js"></script>
 <script src="channel.js"></script>
+<script src="sponsors.js"></script>
 <script>
   // A channel's board. Everything on it comes from the clock: the same moment gives every viewer the same
   // flights, the same camera and the same lines of type. `?speed=60` runs the clock faster, `?t=…` starts it at a
@@ -624,17 +625,8 @@
   // invented 1985 sponsor, a message from the station, now and then a "please stand by". Decided by the clock, so every
   // viewer sees the same card; skipped while the viewer follows a plane.
   const BREAK = 6 * 60000, BREAK_LEN = 8000;
-  // Invented businesses only, never a real one; phone numbers in 555-0100 to 0199, the range kept for fiction.
-  const SPONSORS = [
-    { name: 'The Runway Inn', lines: ['Free airport shuttle every half hour.', 'Color TV in every room. Heated pool.'], phone: '555-0142', bg: '#5a1f1a', ink: '#ffd9a0' },
-    { name: 'Altitude Travel', lines: ['Ask us about Super Saver fares.', 'We book every airline. Even the little ones.'], phone: '555-0117', bg: '#123c5a', ink: '#bfe6ff' },
-    { name: 'Carousel Luggage', lines: ['Hardside or soft.', 'Built to survive the baggage carousel.'], phone: '555-0186', bg: '#3b2a52', ink: '#f2d4ff' },
-    { name: 'Holding Pattern Lounge', lines: ['Cocktails while you wait.', 'Concourse B. Open till the last departure.'], phone: '555-0163', bg: '#173f2c', ink: '#c8f2d6' },
-    { name: 'Tailwind Rent-a-Car', lines: ['Free mileage on weekends.', 'Pick up right outside baggage claim.'], phone: '555-0128', bg: '#5b3b0c', ink: '#ffe3a6' },
-    { name: 'Flight Deck Video', lines: ['VHS and Beta.', 'Rent two movies, the third one is free.'], phone: '555-0151', bg: '#3a1838', ink: '#ffc4ee' },
-    { name: 'Clear Skies Opticians', lines: ['Aviator frames in every size.', 'Glasses in about an hour.'], phone: '555-0109', bg: '#1d3a4a', ink: '#d2f0ff' },
-    { name: 'Jet Lag Mattress Outlet', lines: ['Sleep like you never left.', 'Free delivery across the metro area.'], phone: '555-0194', bg: '#2b2f5c', ink: '#d6dcff' },
-  ];
+  // The sponsors: invented businesses near this airline's hubs, and Skyarium (sponsors.js).
+  const SPONSORS = window.SPONSORS[BD.airline] || Object.values(window.SPONSORS).flat();
   const MESSAGES = [
     ['Fasten your seat belt.', 'In the car too.'],
     ['Smoking is permitted in designated rows only.', 'Please check with your flight attendant.'],
@@ -709,14 +701,16 @@
       if (nx) text(`${nx.n} departures in the hour, as scheduled in 1985`, 240, 236, 12, AMBER, 'center');
       text(`Channel ${CH} · ${BD.name}`, 240, 300, 12, WHITE, 'center');
     } else if (br.kind === 'sponsor') {
-      const s = SPONSORS[(br.n * 3) % SPONSORS.length]; // in turn (three apart), so the same one doesn't come round soon
+      const s = SPONSORS[br.n % SPONSORS.length]; // the channel's sponsors in turn
       block(0, 0, 480, 360, s.bg);
-      text('This portion of Ghostflights is brought to you by', 240, 70, 11, WHITE, 'center');
-      block(60, 96, 360, 2, s.ink);
-      text(s.name, 240, 150, 34, s.ink, 'center');
-      block(60, 168, 360, 2, s.ink);
-      s.lines.forEach((l, i) => text(l, 240, 206 + i * 22, 15, WHITE, 'center'));
-      text(`Call ${s.phone}`, 240, 290, 18, s.ink, 'center');
+      text('This portion of Ghostflights is brought to you by', 240, 44, 11, WHITE, 'center');
+      ctx.save(); ctx.translate(240, 92); ctx.scale(1.3, 1.3); (window.SPONSOR_ICONS[s.icon] || (() => {}))(ctx, s.ink); ctx.restore();
+      block(60, 128, 360, 2, s.ink);
+      text(s.name, 240, 168, 32, s.ink, 'center');
+      block(60, 182, 360, 2, s.ink);
+      s.lines.forEach((l, i) => text(l, 240, 212 + i * 21, 14, WHITE, 'center'));
+      text(s.where, 240, 268, 12, s.ink, 'center');
+      if (s.phone) text(`Call ${s.phone}`, 240, 306, 18, WHITE, 'center');
     } else if (br.kind === 'plane') {
       // One of the types flying on this board now, its paint big: a different one each time, by turns.
       const kinds = [];
