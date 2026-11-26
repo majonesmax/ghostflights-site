@@ -194,10 +194,10 @@
     const when = new Date(`${thenDate(t)}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
     for (const plug of PLUGS) {
       let run = 0;
-      if (wx) {
-        items.push({ s: `Weather ${when}`, c: AMBER }); run += w(`Weather ${when}`) + 30;
-        for (let k = 0; run < PX_S * 35; k++) { const it = wx[k % wx.length]; items.push({ s: it, c: WHITE }); run += w(it) + 30; }
-      }
+      // the weather, or without it (the archive can turn a request away) what's on the channel, never plugs alone
+      const head = wx ? `Weather ${when}` : 'On Skyarium Presents', list = wx || SLIDES.map((x) => x.caption[0]);
+      items.push({ s: head, c: AMBER }); run += w(head) + 30;
+      for (let k = (PLUGS.indexOf(plug) * 4) % list.length; run < PX_S * 35; k++) { const it = list[k % list.length]; items.push({ s: it, c: WHITE }); run += w(it) + 30; }
       items.push({ s: plug, c: AMBER });
     }
     const SEP = '  ·  ', sepW = w(SEP);
