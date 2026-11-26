@@ -111,6 +111,14 @@ window.SPONSORS = (() => {
       S('Eighteenth & Vine Records', 'record', ['Jazz and blues on vinyl.', 'Live music Saturday afternoons.'], 'Kansas City', '555-0194', '#1a1a1a', '#ff7a7a'),
       skyarium('Dallas'),
     ],
+    CO1934: [
+      S('Bayou City Bowl', 'bowling', ['40 lanes and a cocktail lounge.', 'Leagues every night.'], 'Houston, near Intercontinental', '555-0105', '#16324a', '#ffd23c'),
+      S('Gulfgate Steakhouse', 'food', ['Chicken-fried steak and Gulf shrimp.', 'Open late for the last flights in.'], 'Houston', '555-0125', '#3a1a0e', '#ffcf6a'),
+      S('Mile High TV Repair', 'tv', ['Color sets fixed while you wait.', 'House calls all over Denver.'], 'Denver', '555-0154', '#3b2a1c', '#ffcf8a'),
+      S('Front Range Ski Rental', 'ski', ['Skis, boots and poles by the day.', 'An hour from Stapleton.'], 'Up in the mountains', '555-0163', '#2a3c5a', '#cfe8ff'),
+      S('Astrodome Arcade', 'arcade', ['Forty games and a prize counter.', 'Tokens four for a dollar.'], 'Houston', '555-0178', '#1a1030', '#ff7ae0'),
+      skyarium('Houston'),
+    ],
     MC1981: [
       S('Space City Arcade', 'arcade', ['Forty games. Tokens four for a dollar.', 'Open till midnight.'], 'Houston', '555-0175', '#1a1030', '#7ad0ff'),
       S('Lemmon Avenue Diner', 'food', ['Chicken-fried steak and cream gravy.', 'Pie by the slice all day.'], 'Dallas', '555-0124', '#3a1a0e', '#ffcf6a'),
