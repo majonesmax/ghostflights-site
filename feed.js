@@ -2,7 +2,8 @@
 // 1985 schedules, and the same as simple records anyone can use. The station, the guide and the feed page all fly
 // from this one copy.
 //
-// In a page: <script src="feed-data.js"></script><script src="feed.js"></script>, then Ghostflights.feed().
+// In a page: <script src="feed-data.js"></script><script src="feed.js"></script>, then Ghostflights.feed() (everything in the
+// air now) or Ghostflights.query({ lat, lon, radius }) and the rest (api.html says how).
 // In Node: require('./feed-data.js'); require('./feed.js'); globalThis.Ghostflights.feed().
 //
 // Every record says it's simulated and its year (1985, or 1979 for Hughes Airwest). There's no ICAO address, and flight numbers appear only where a
@@ -123,32 +124,120 @@
     return { lat: lat / rad, lon: lon / rad, track: (track / rad + 360) % 360 };
   }
 
-  // The feed: every scheduled flight in the air at t, as plain records.
-  function feed(t = Date.now(), data = root.GHOSTFLIGHTS_DATA) {
-    const run = engine(data);
-    return run.airborne(t).map((f) => {
-      const airline = data.airlines[f.airline];
-      const at = along(data.positions[f.from], data.positions[f.to], f.along);
-      const climbing = f.alt < f.cruise && f.along < 0.5, descending = f.alt < f.cruise && f.along >= 0.5;
-      return {
-        simulated: true,
-        year: airline.year || 1985,
-        flight: `${airline.code} ${f.number}`,
-        airline: airline.name,
-        type: (airline.types && airline.types[f.kind]) || f.kind,
-        from: f.from,
-        to: f.to,
-        departedThen: new Date(thenIn(f.d, airline.year) + (f.depart - f.d * DAY)).toISOString().slice(0, 16) + 'Z',
-        lat: Math.round(at.lat * 1e4) / 1e4,
-        lon: Math.round(at.lon * 1e4) / 1e4,
-        track: Math.round(at.track),
-        altitudeFt: f.alt,
-        groundSpeedKt: Math.round(f.nm / ((f.block - Math.min(20, f.block * 0.35)) / 60) / 5) * 5, // the block's average, less taxi and climb-out
-        phase: climbing ? 'climbing' : descending ? 'descending' : 'cruising',
-        source: airline.source,
-      };
-    });
+  // One flight in the air as a plain record.
+  function record(f, data) {
+    const airline = data.airlines[f.airline];
+    const at = along(data.positions[f.from], data.positions[f.to], f.along);
+    const climbing = f.alt < f.cruise && f.along < 0.5, descending = f.alt < f.cruise && f.along >= 0.5;
+    return {
+      simulated: true,
+      year: airline.year || 1985,
+      flight: `${airline.code} ${f.number}`,
+      airline: airline.name,
+      airlineCode: f.airline,
+      type: (airline.types && airline.types[f.kind]) || f.kind,
+      typeCode: f.kind,
+      from: f.from,
+      to: f.to,
+      departedThen: new Date(thenIn(f.d, airline.year) + (f.depart - f.d * DAY)).toISOString().slice(0, 16) + 'Z',
+      lat: Math.round(at.lat * 1e4) / 1e4,
+      lon: Math.round(at.lon * 1e4) / 1e4,
+      track: Math.round(at.track),
+      altitudeFt: f.alt,
+      groundSpeedKt: Math.round(f.nm / ((f.block - Math.min(20, f.block * 0.35)) / 60) / 5) * 5, // the block's average, less taxi and climb-out
+      phase: climbing ? 'climbing' : descending ? 'descending' : 'cruising',
+      source: airline.source,
+    };
   }
 
-  root.Ghostflights = { engine, feed, flies, thenIn, then1985, noteDate, cruiseFt, altitude, km };
+  // The feed: every flight in the air at moment t (now, unless given), as plain records. A few hundred to a thousand.
+  function feed(t = Date.now(), data = root.GHOSTFLIGHTS_DATA) {
+    return engine(data).airborne(t).map((f) => record(f, data));
+  }
+
+  // A moment, as a number, a Date or an ISO string.
+  const when = (t) => (t == null ? Date.now() : typeof t === 'number' ? t : Date.parse(t));
+  // Whether a flight in the engine's terms matches a query's filters.
+  function matches(f, q, data) {
+    const a = data.airlines[f.airline];
+    if (q.airline) {
+      const want = String(q.airline).toLowerCase();
+      if (![f.airline, a.code, a.name].some((v) => v && (v.toLowerCase() === want || (want.length > 3 && v.toLowerCase().includes(want))))) return false;
+    }
+    if (q.flight != null) {
+      const want = String(q.flight).toUpperCase().replace(/\s+/g, '');
+      if (!(want === `${a.code}${f.number}` || want === String(f.number))) return false;
+    }
+    if (q.type && ![f.kind, a.types && a.types[f.kind]].some((v) => v && v.toUpperCase() === String(q.type).toUpperCase())) return false;
+    if (q.from && f.from !== q.from.toUpperCase()) return false;
+    if (q.to && f.to !== q.to.toUpperCase()) return false;
+    return true;
+  }
+
+  // Ask the feed like a receiver: the flights in the air at q.at (now, unless given) that match, nearest first when
+  // given a place.
+  //   query({ lat, lon, radius })        within radius nautical miles of a point (radius 100 if not given)
+  //   query({ airline, flight, type })   airline: its code (PA1927), its designator (PA) or its name (Pan Am);
+  //                                      flight: "NW 17", "NW17" or 17; type: "B742" or "747"
+  //   query({ from, to, phase, minAltFt, maxAltFt, limit, at })
+  // Each record as feed() has it, with distanceNm when given a place.
+  function query(q = {}, data = root.GHOSTFLIGHTS_DATA) {
+    const near = q.lat != null && q.lon != null, radius = q.radius != null ? +q.radius : 100;
+    let out = engine(data).airborne(when(q.at)).filter((f) => matches(f, q, data)).map((f) => record(f, data));
+    if (q.phase) out = out.filter((r) => r.phase === q.phase);
+    if (q.minAltFt != null) out = out.filter((r) => r.altitudeFt >= +q.minAltFt);
+    if (q.maxAltFt != null) out = out.filter((r) => r.altitudeFt <= +q.maxAltFt);
+    if (near) {
+      for (const r of out) r.distanceNm = Math.round(km([+q.lat, +q.lon], [r.lat, r.lon]) / 1.852);
+      out = out.filter((r) => r.distanceNm <= radius).sort((x, y) => x.distanceNm - y.distanceNm);
+    }
+    return q.limit ? out.slice(0, +q.limit) : out;
+  }
+
+  // The legs in the air at any time between q.start and q.end (an hour from now, unless given), with the same
+  // filters as query() except place and phase: when each leaves and lands, not where it is.
+  function flights(q = {}, data = root.GHOSTFLIGHTS_DATA) {
+    const start = when(q.start), end = q.end != null ? when(q.end) : start + 3600000, out = [];
+    for (const [code, airline] of Object.entries(data.airlines)) {
+      for (const row of airline.schedule || []) {
+        const [num, from, to, leave, offset, block, , , , kind] = row;
+        if (!data.positions[from] || !data.positions[to]) continue;
+        for (let d = Math.floor(start / DAY) - 1; d <= Math.floor(end / DAY) + 1; d++) {
+          const depart = d * DAY + (offset + leave) * 60000, arrive = depart + block * 60000;
+          if (arrive <= start || depart >= end || !flies(row, d, airline.year)) continue;
+          const f = { airline: code, number: num, from, to, kind, d };
+          if (!matches(f, q, data)) continue;
+          out.push({ simulated: true, year: airline.year || 1985, flight: `${airline.code} ${num}`, airline: airline.name, airlineCode: code,
+            type: (airline.types && airline.types[kind]) || kind, typeCode: kind, from, to,
+            departs: new Date(depart).toISOString().slice(0, 16) + 'Z', arrives: new Date(arrive).toISOString().slice(0, 16) + 'Z',
+            departedThen: new Date(thenIn(d, airline.year) + (depart - d * DAY)).toISOString().slice(0, 16) + 'Z', source: airline.source });
+        }
+      }
+    }
+    out.sort((x, y) => x.departs.localeCompare(y.departs) || x.flight.localeCompare(y.flight));
+    return q.limit ? out.slice(0, +q.limit) : out;
+  }
+
+  // One flight's positions every q.every seconds (60, unless given) between q.start and q.end (the next hour,
+  // unless given), like a track log: its records from query(), with the moment each was at.
+  function track(flight, q = {}, data = root.GHOSTFLIGHTS_DATA) {
+    const start = when(q.start), end = q.end != null ? when(q.end) : start + 3600000, step = Math.max(10, +(q.every || 60)) * 1000, out = [];
+    for (let t = start; t <= end && out.length < 2000; t += step) {
+      const r = query({ ...q, flight, at: t, start: undefined, end: undefined }, data)[0];
+      if (r) out.push({ at: new Date(t).toISOString().slice(0, 19) + 'Z', ...r });
+    }
+    return out;
+  }
+
+  // The same as an ADS-B receiver's JSON (the field names of adsb.lol and ADS-B Exchange's v2): { now, total, ac }.
+  // Still marked simulated, and still no ICAO address ("hex"): nothing here can pass for real traffic.
+  function adsb(q = {}, data = root.GHOSTFLIGHTS_DATA) {
+    const now = when(q.at), ac = query({ ...q, at: now }, data).map((r) => ({
+      flight: r.flight.replace(' ', ''), t: r.typeCode, lat: r.lat, lon: r.lon, alt_baro: r.altitudeFt, gs: r.groundSpeedKt, track: r.track,
+      ...(r.distanceNm != null ? { dst: r.distanceNm } : {}), from: r.from, to: r.to, airline: r.airline, year: r.year, simulated: true,
+    }));
+    return { now, total: ac.length, simulated: true, ac };
+  }
+
+  root.Ghostflights = { engine, feed, query, flights, track, adsb, flies, thenIn, then1985, noteDate, cruiseFt, altitude, km };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

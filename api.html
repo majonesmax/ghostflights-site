@@ -19,8 +19,18 @@
   .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 14px; font-size: 14px; color: var(--quiet); }
   .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); }
   .page table { font-size: 13.5px; }
-  .page th, .page td { white-space: nowrap; }
+  .scroll th, .scroll td { white-space: nowrap; }
+  .page table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+  .page th, .page td { text-align: left; vertical-align: top; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--rule); }
+  .page th { color: var(--quiet); font-weight: normal; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ask { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 10px 0 12px; }
+  .ask label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--quiet); text-transform: uppercase; letter-spacing: 0.04em; }
+  .ask input, .ask select { font: 15px/1.2 inherit; padding: 7px 8px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--white); }
+  .page pre.json { max-height: 360px; overflow: auto; }
+  .page h3 { font-family: ui-monospace, Menlo, monospace; text-transform: none; letter-spacing: 0; color: var(--amber); margin-top: 28px; }
+  .page dl.calls dt { margin-top: 14px; font-family: ui-monospace, Menlo, monospace; color: var(--amber); text-transform: none; }
+  .page dl.calls dd { margin: 4px 0 0 0; }
 </style>
 </head>
 <body>
@@ -28,37 +38,187 @@
   <nav><a href="index.html?tv=1">Watch</a><a href="timetable.html">Timetables</a><a href="airlines/index.html">Airlines</a><a href="about.html">About</a><a href="api.html" aria-current="page">API</a></nav></header>
 <main class="page">
 <h1>Ghostflights API</h1>
-<p class="lead">The flights on Ghostflights as data you can use. Departed airlines fly their real schedules and this is where they are right now.</p>
+<p class="lead">The Ghostflights API gives you the flights on Ghostflights as data. Departed airlines fly their real 1985 timetables (1979 for Hughes Airwest and Braniff) and the API tells you where each flight is at any moment.</p>
 
-<h2>Not real traffic</h2>
+<h2>What it is</h2>
+<p>It answers the questions you'd ask a flight tracking feed. What's in the air near this place right now? Where are Pan Am's 747s? What's leaving Minneapolis in the next hour? The schedules are real. The positions are simulated along each route from its timetable times.</p>
+<p>It is not real traffic and it can't be mistaken for it:</p>
 <ul>
-  <li>Every record says <code>"simulated": true</code> and the year it's set in. That's 1985 except for Hughes Airwest and Braniff International, which are set in 1979.</li>
-  <li>There's no ICAO address on anything. Nothing here is shaped to slip into a real tracker.</li>
-  <li>Flight numbers come only from a printed timetable. The feed never makes one up.</li>
-  <li>Only airlines that are gone. No airline flying today appears, not even in its old paint.</li>
+  <li>Every record has <code>"simulated": true</code> and the year it's set in.</li>
+  <li>There's no ICAO address on anything, so nothing can be fed into a real tracker.</li>
+  <li>Flight numbers are only ones a timetable printed. There are no tail numbers because the timetables don't list them.</li>
+  <li>Only airlines that no longer fly appear. No airline flying today shows up.</li>
 </ul>
 
-<h2>In the air now</h2>
-<div class="bar"><span id="count">Loading…</span><button id="save">Save this moment as JSON</button></div>
-<div class="scroll"><table>
-  <thead><tr><th>Flight</th><th>Type</th><th>From</th><th>To</th><th class="num">Feet</th><th class="num">Knots</th><th>Phase</th></tr></thead>
-  <tbody id="rows"></tbody>
-</table></div>
-
-<h2>Use it</h2>
-<p>It runs in the page with no server. Two files hold everything. <a href="feed.js">feed.js</a> is the schedule engine and <a href="feed-data.js">feed-data.js</a> holds the schedules. The flights come from the clock and every copy agrees.</p>
-<pre>&lt;script src="feed-data.js"&gt;&lt;/script&gt;
-&lt;script src="feed.js"&gt;&lt;/script&gt;
+<h2>How it works</h2>
+<p>The API is a JavaScript library, not a web service. There's no server, no API key and no network request after you load it. It's two files:</p>
+<table>
+  <tr><th>File</th><th>Size</th><th>What it holds</th></tr>
+  <tr><td><a href="feed-data.js">feed-data.js</a></td><td>450 KB</td><td>Every airline's schedule and the airports' positions</td></tr>
+  <tr><td><a href="feed.js">feed.js</a></td><td>14 KB</td><td>The engine that works out where each flight is</td></tr>
+</table>
+<p>Each query is for a point in time. The engine selects the flights scheduled to be airborne at that time. Each position is interpolated along the great-circle route between origin and destination by the share of the scheduled block time that has elapsed. The calculation is deterministic. The same query for the same time always returns the same result. Every client therefore shows the same flights without a shared server.</p>
+<p>Load it in a page:</p>
+<pre>&lt;script src="https://ghostflights.tv/feed-data.js"&gt;&lt;/script&gt;
+&lt;script src="https://ghostflights.tv/feed.js"&gt;&lt;/script&gt;
 &lt;script&gt;
-  const flights = Ghostflights.feed();          // right now
-  const later = Ghostflights.feed(Date.now() + 3600e3);  // in an hour
+  const nearby = Ghostflights.query({ lat: 44.88, lon: -93.22, radius: 150 });
 &lt;/script&gt;</pre>
-<p>Or in Node:</p>
+<p>Or in Node, with both files downloaded next to your script:</p>
 <pre>require('./feed-data.js');
 require('./feed.js');
-console.log(globalThis.Ghostflights.feed());</pre>
-<p>A record looks like this one, live:</p>
-<pre id="sample"></pre>
+const { query } = globalThis.Ghostflights;
+console.log(query({ airline: 'Pan Am', type: '747' }));</pre>
+
+<h2>Reference</h2>
+<p>Times can be milliseconds since 1970, a <code>Date</code> or an ISO 8601 string like <code>"2026-11-27T02:00Z"</code>. Leave a time out to mean now. Distances are in nautical miles.</p>
+
+<h3>Ghostflights.query(options)</h3>
+<p>Returns the flights in the air at one moment that match every option you give, as an array of <a href="#records">records</a>.</p>
+<table>
+  <tr><th>Option</th><th>Type</th><th>Meaning</th></tr>
+  <tr><td><code>at</code></td><td>time</td><td>The moment to ask about. Default: now.</td></tr>
+  <tr><td><code>lat</code>, <code>lon</code></td><td>number</td><td>A place. Results are sorted nearest first and each gets <code>distanceNm</code>.</td></tr>
+  <tr><td><code>radius</code></td><td>number</td><td>How far from the place to look. Default: 100.</td></tr>
+  <tr><td><code>airline</code></td><td>string</td><td>Its code (<code>PA1927</code>), its two-letter designator (<code>PA</code>) or part of its name (<code>Pan Am</code>).</td></tr>
+  <tr><td><code>type</code></td><td>string</td><td>A type code (<code>B742</code>) or name (<code>747</code>).</td></tr>
+  <tr><td><code>flight</code></td><td>string or number</td><td><code>"NW 17"</code>, <code>"NW17"</code> or <code>17</code>.</td></tr>
+  <tr><td><code>from</code>, <code>to</code></td><td>string</td><td>Origin or destination airport code.</td></tr>
+  <tr><td><code>phase</code></td><td>string</td><td><code>climbing</code>, <code>cruising</code> or <code>descending</code>.</td></tr>
+  <tr><td><code>minAltFt</code>, <code>maxAltFt</code></td><td>number</td><td>An altitude range in feet.</td></tr>
+  <tr><td><code>limit</code></td><td>number</td><td>Return at most this many.</td></tr>
+</table>
+<pre>Ghostflights.query({ lat: 44.88, lon: -93.22, radius: 50, limit: 1 })</pre>
+<pre>[
+  {
+    "simulated": true,
+    "year": 1985,
+    "flight": "RC 939",
+    "airline": "Republic Airlines",
+    "airlineCode": "RC1979",
+    "type": "Convair 580",
+    "typeCode": "CV580",
+    "from": "EAU",
+    "to": "MSP",
+    "departedThen": "1985-11-27T01:35Z",
+    "lat": 44.8795,
+    "lon": -92.9321,
+    "track": 270,
+    "altitudeFt": 12000,
+    "groundSpeedKt": 225,
+    "phase": "cruising",
+    "source": "Republic Airlines quick reference schedules, 1984 to 1986",
+    "distanceNm": 12
+  }
+]</pre>
+
+<h3>Ghostflights.feed(time)</h3>
+<p>Returns every flight in the air at that moment, with no filtering. Expect several hundred to about a thousand records. It's the same as <code>query({ at: time })</code>.</p>
+<pre>const everything = Ghostflights.feed();</pre>
+
+<h3>Ghostflights.flights(options)</h3>
+<p>Returns the scheduled legs that are in the air at any point between <code>start</code> and <code>end</code>, with their departure and arrival times. Use it for an airport's arrivals and departures. It takes the same <code>airline</code>, <code>type</code>, <code>flight</code>, <code>from</code>, <code>to</code> and <code>limit</code> options as <code>query</code>.</p>
+<table>
+  <tr><th>Option</th><th>Type</th><th>Meaning</th></tr>
+  <tr><td><code>start</code></td><td>time</td><td>The start of the window. Default: now.</td></tr>
+  <tr><td><code>end</code></td><td>time</td><td>The end of the window. Default: one hour after <code>start</code>.</td></tr>
+</table>
+<pre>Ghostflights.flights({ from: 'MSP', limit: 1 })</pre>
+<pre>[
+  {
+    "simulated": true,
+    "year": 1985,
+    "flight": "NW 758",
+    "airline": "Northwest Orient Airlines",
+    "airlineCode": "NWA",
+    "type": "727",
+    "typeCode": "B722",
+    "from": "MSP",
+    "to": "TPA",
+    "departs": "2026-11-26T23:25Z",
+    "arrives": "2026-11-27T02:17Z",
+    "departedThen": "1985-11-26T23:25Z",
+    "source": "Northwest Orient system timetable, effective October 27, 1985"
+  }
+]</pre>
+
+<h3>Ghostflights.track(flight, options)</h3>
+<p>Returns one flight's position at regular steps between <code>start</code> and <code>end</code>, like a track log. Each entry is a record with an <code>at</code> time added. Moments when the flight isn't airborne are skipped.</p>
+<table>
+  <tr><th>Option</th><th>Type</th><th>Meaning</th></tr>
+  <tr><td><code>start</code></td><td>time</td><td>Default: now.</td></tr>
+  <tr><td><code>end</code></td><td>time</td><td>Default: one hour after <code>start</code>.</td></tr>
+  <tr><td><code>every</code></td><td>number</td><td>Seconds between positions. Default: 60.</td></tr>
+</table>
+<pre>Ghostflights.track('NW 17', { every: 300 })</pre>
+
+<h3>Ghostflights.adsb(options)</h3>
+<p>Takes the same options as <code>query</code> and returns the answer in the JSON shape of ADS-B receivers and aggregators like adsb.lol and ADS-B Exchange, so code written for them can read it. It's still marked simulated and still has no <code>hex</code> address.</p>
+<pre>Ghostflights.adsb({ lat: 40.64, lon: -73.78, radius: 40, limit: 1 })</pre>
+<pre>{
+  "now": 1795744800000,
+  "total": 1,
+  "simulated": true,
+  "ac": [
+    {
+      "flight": "EA128",
+      "t": "B722",
+      "lat": 40.7585,
+      "lon": -73.9368,
+      "alt_baro": 33000,
+      "gs": 445,
+      "track": 53,
+      "dst": 10,
+      "from": "ATL",
+      "to": "BOS",
+      "airline": "Eastern Air Lines",
+      "year": 1985,
+      "simulated": true
+    }
+  ]
+}</pre>
+
+<h3 id="records">Records</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Meaning</th></tr>
+  <tr><td><code>flight</code></td><td>string</td><td>Designator and number as printed, like <code>"NW 17"</code>.</td></tr>
+  <tr><td><code>airline</code>, <code>airlineCode</code></td><td>string</td><td>The airline's name and its code in this data.</td></tr>
+  <tr><td><code>type</code>, <code>typeCode</code></td><td>string</td><td>The plane's type as named (<code>747</code>) and as a type code (<code>B742</code>).</td></tr>
+  <tr><td><code>from</code>, <code>to</code></td><td>string</td><td>Airport codes.</td></tr>
+  <tr><td><code>lat</code>, <code>lon</code></td><td>number</td><td>Position in degrees.</td></tr>
+  <tr><td><code>track</code></td><td>number</td><td>Heading over the ground in degrees.</td></tr>
+  <tr><td><code>altitudeFt</code></td><td>number</td><td>Altitude in feet, estimated from the route's length.</td></tr>
+  <tr><td><code>groundSpeedKt</code></td><td>number</td><td>Ground speed in knots, estimated from the scheduled time.</td></tr>
+  <tr><td><code>phase</code></td><td>string</td><td><code>climbing</code>, <code>cruising</code> or <code>descending</code>.</td></tr>
+  <tr><td><code>departedThen</code></td><td>string</td><td>When it took off on the same date in its own year.</td></tr>
+  <tr><td><code>departs</code>, <code>arrives</code></td><td>string</td><td>From <code>flights</code> only: today's scheduled times in UTC.</td></tr>
+  <tr><td><code>distanceNm</code></td><td>number</td><td>From <code>query</code> with a place only: distance from it.</td></tr>
+  <tr><td><code>year</code></td><td>number</td><td>1985, or 1979 for Hughes Airwest and Braniff.</td></tr>
+  <tr><td><code>source</code></td><td>string</td><td>The timetable the flight comes from.</td></tr>
+  <tr><td><code>simulated</code></td><td>boolean</td><td>Always <code>true</code>.</td></tr>
+</table>
+
+<h2>Try it</h2>
+<p>Set a place and radius or pick an airline, type or flight. The results are computed in this page. "Link to this query" gives a URL that runs the same query.</p>
+<form class="ask" id="ask">
+  <label>Near <select id="near"><option value="">Anywhere</option></select></label>
+  <label>Latitude <input id="lat" inputmode="decimal" placeholder="44.88"></label>
+  <label>Longitude <input id="lon" inputmode="decimal" placeholder="-93.22"></label>
+  <label>Radius (nm) <input id="radius" inputmode="numeric" placeholder="100"></label>
+  <label>Airline <select id="airline"><option value="">Any</option></select></label>
+  <label>Type <input id="type" placeholder="747 or B742"></label>
+  <label>Flight <input id="flight" placeholder="NW 17"></label>
+  <label>Format <select id="shape"><option value="records">Records</option><option value="adsb">ADS-B style</option></select></label>
+</form>
+<div class="bar"><span id="count">Loading…</span><a id="link" href="api.html">Link to this query</a><button id="save">Save as JSON</button></div>
+<div class="scroll"><table>
+  <thead><tr><th>Flight</th><th>Type</th><th>From</th><th>To</th><th class="num">Feet</th><th class="num">Knots</th><th>Phase</th><th class="num">Nm away</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table></div>
+<p>The call:</p>
+<pre id="code"></pre>
+<p>Its result:</p>
+<pre class="json" id="answer"></pre>
 
 <h2>Where it comes from</h2>
 <ul>
@@ -74,18 +234,48 @@ console.log(globalThis.Ghostflights.feed());</pre>
 <script src="feed-data.js"></script>
 <script src="feed.js"></script>
 <script>
-  const rows = document.getElementById('rows'), count = document.getElementById('count'), sample = document.getElementById('sample');
-  function show() {
-    const flights = Ghostflights.feed().sort((a, b) => a.flight.localeCompare(b.flight, 'en', { numeric: true }));
-    count.textContent = `${flights.length} flights in the air, as of ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-    rows.innerHTML = flights.map((f) => `<tr><td>${f.flight}</td><td>${f.type}</td><td>${f.from}</td><td>${f.to}</td>` +
-      `<td class="num">${f.altitudeFt.toLocaleString()}</td><td class="num">${f.groundSpeedKt}</td><td>${f.phase}</td></tr>`).join('');
-    if (flights.length) sample.textContent = JSON.stringify(flights[0], null, 2);
+  // The Ask it panel: the form's fields as a query, the answer as a table and as JSON, and the query as a link.
+  const G = Ghostflights, D = window.GHOSTFLIGHTS_DATA, $ = (id) => document.getElementById(id);
+  const PLACES = [['MSP', 'Minneapolis'], ['JFK', 'New York Kennedy'], ['ORD', 'Chicago'], ['ATL', 'Atlanta'], ['DFW', 'Dallas/Fort Worth'],
+    ['DEN', 'Denver'], ['LAX', 'Los Angeles'], ['SFO', 'San Francisco'], ['SEA', 'Seattle'], ['MIA', 'Miami'], ['HNL', 'Honolulu'], ['LHR', 'London']];
+  for (const [code, name] of PLACES) if (D.positions[code]) $('near').append(new Option(name, code));
+  for (const [code, a] of Object.entries(D.airlines).sort((x, y) => x[1].name.localeCompare(y[1].name))) $('airline').append(new Option(a.name, code));
+  const FIELDS = ['lat', 'lon', 'radius', 'airline', 'type', 'flight', 'shape'];
+  const params = new URLSearchParams(location.search);
+  for (const k of FIELDS) if (params.get(k)) $(k).value = params.get(k);
+  // With no query in the link, start near Minneapolis so the first answer is a short list, not the whole feed.
+  if (!FIELDS.some((k) => params.get(k))) { const p = D.positions.MSP; $('near').value = 'MSP'; $('lat').value = p[0]; $('lon').value = p[1]; $('radius').value = 150; }
+  $('near').onchange = () => { const p = D.positions[$('near').value]; if (p) { $('lat').value = p[0]; $('lon').value = p[1]; $('radius').value ||= 150; } show(); };
+  function asked() {
+    const q = {};
+    for (const k of ['lat', 'lon', 'radius', 'airline', 'type', 'flight']) if ($(k).value.trim()) q[k] = ['lat', 'lon', 'radius'].includes(k) ? +$(k).value : $(k).value.trim();
+    if (q.lat == null || q.lon == null) { delete q.lat; delete q.lon; delete q.radius; }
+    return q;
   }
+  let last = null;
+  function show() {
+    const q = asked(), adsb = $('shape').value === 'adsb';
+    const answer = adsb ? G.adsb(q) : G.query(q).sort((a, b) => (a.distanceNm ?? 0) - (b.distanceNm ?? 0) || a.flight.localeCompare(b.flight, 'en', { numeric: true }));
+    last = answer;
+    const list = adsb ? G.query(q) : answer;
+    $('count').textContent = `${list.length} flights in the air, as of ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    $('rows').innerHTML = list.slice(0, 300).map((f) => `<tr><td>${f.flight}</td><td>${f.type}</td><td>${f.from}</td><td>${f.to}</td>` +
+      `<td class="num">${f.altitudeFt.toLocaleString()}</td><td class="num">${f.groundSpeedKt}</td><td>${f.phase}</td><td class="num">${f.distanceNm ?? ''}</td></tr>`).join('');
+    const args = JSON.stringify(q).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ').replace(/^\{(.)/, '{ $1').replace(/(.)\}$/, '$1 }');
+    $('code').textContent = `Ghostflights.${adsb ? 'adsb' : Object.keys(q).length ? 'query' : 'feed'}(${Object.keys(q).length || adsb ? args : ''})`;
+    const shown = adsb ? { ...answer, ac: answer.ac.slice(0, 20) } : answer.slice(0, 20);
+    const more = (adsb ? answer.ac.length : answer.length) - 20;
+    $('answer').textContent = JSON.stringify(shown, null, 2) + (more > 0 ? `\n… and ${more} more` : '');
+    const link = new URLSearchParams();
+    for (const k of FIELDS) if ($(k).value.trim() && !(k === 'shape' && $(k).value === 'records')) link.set(k, $(k).value.trim());
+    $('link').href = `api.html${link.toString() ? `?${link}` : ''}`;
+  }
+  $('ask').oninput = show;
+  $('ask').onsubmit = (e) => e.preventDefault();
   show();
   setInterval(show, 4000);
-  document.getElementById('save').onclick = () => {
-    const blob = new Blob([JSON.stringify(Ghostflights.feed(), null, 1)], { type: 'application/json' });
+  $('save').onclick = () => {
+    const blob = new Blob([JSON.stringify(last, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `ghostflights-${new Date().toISOString().slice(0, 16).replace(':', '')}.json`;
