@@ -60,6 +60,8 @@
     background: repeating-conic-gradient(rgba(0, 0, 0, 0.16) 0 5deg, transparent 5deg 15deg), radial-gradient(circle at 35% 30%, #efe6d4, #b3a48c 60%, #75664f); }
   .knob.channel .num { position: absolute; left: 50%; top: 50%; font: 700 0.6em/1 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.06em;
     color: #e9dcc4; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-2.8em); }
+  .knob.channel .num.high { color: #ffbf2e; }
+  .knob.channel .num.guide { transform: translate(-50%, -50%) rotate(var(--a)) translateY(-2.8em) scale(1.5); }
   /* The pointer rides with the knob, turned back as far as the knob turns, so it stays at the top. */
   .knob.channel .pointer { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin: -0.2em 0 0 -0.32em;
     border: 0.32em solid transparent; border-top: 0.42em solid #f7c98b; border-bottom: 0;
@@ -164,7 +166,9 @@
   // round, past the last channel to 0 and on, always the short way.
   const NOTCH = 360 / CHS.length;
   channelKnob.append(Object.assign(document.createElement('span'), { className: 'grip' }),
-    ...CHS.map((c, i) => Object.assign(document.createElement('span'), { className: 'num', textContent: c, style: `--a: ${NOTCH * i}deg` })));
+    // Single figures in two bands of ten: 1 to 9 and 0 (channel 10) in cream, then again in gold for 11 to 20 (gold 1
+    // is 11). The guide, channel 0, is a dot.
+    ...CHS.map((c, i) => Object.assign(document.createElement('span'), { className: +c > 10 ? 'num high' : +c === 0 ? 'num guide' : 'num', textContent: +c === 0 ? '•' : String(c % 10), style: `--a: ${NOTCH * i}deg` })));
   channelKnob.append(Object.assign(document.createElement('span'), { className: 'pointer' }));
   let turned = 0; // the knob's angle, kept running so it never spins back the long way
   // A watchdog on every change of channel: no picture in 12 seconds and the set tunes again; no picture the second

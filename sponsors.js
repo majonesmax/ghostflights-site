@@ -111,6 +111,14 @@ window.SPONSORS = (() => {
       S('Eighteenth & Vine Records', 'record', ['Jazz and blues on vinyl.', 'Live music Saturday afternoons.'], 'Kansas City', '555-0194', '#1a1a1a', '#ff7a7a'),
       skyarium('Dallas'),
     ],
+    AL1979: [
+      S('Three Rivers Lanes', 'bowling', ['40 lanes and a snack bar.', 'Leagues forming for the winter.'], 'Pittsburgh', '555-0137', '#16324a', '#ffd23c'),
+      S('Strip District Deli', 'food', ['Pierogies and chipped ham.', 'Open early for the first flights out.'], 'Pittsburgh', '555-0140', '#3a1a0e', '#ffcf6a'),
+      S('Allegheny TV & Stereo', 'tv', ['Color sets fixed while you wait.', 'House calls in all three rivers.'], 'Pittsburgh', '555-0142', '#3b2a1c', '#ffcf8a'),
+      S('Airport Parkway Motor Inn', 'motel', ['Color TV and free coffee.', 'Ten minutes from Greater Pitt.'], 'Coraopolis', '555-0149', '#4a1a14', '#ffb070'),
+      S('Station Square Arcade', 'arcade', ['Forty games and skee-ball.', 'Tokens four for a dollar.'], 'Pittsburgh', '555-0150', '#1a1030', '#ff7ae0'),
+      skyarium('Pittsburgh'),
+    ],
     ML1979: [
       S('Cicero Avenue Lanes', 'bowling', ['36 lanes and a pro shop.', 'Midnight bowling on Fridays.'], 'Across from Midway', '555-0107', '#16324a', '#ffd23c'),
       S('Archer Avenue Beef', 'food', ['Italian beef dipped or dry.', 'Open late for the night crews.'], 'Chicago, near Midway', '555-0111', '#3a1a0e', '#ffcf6a'),
