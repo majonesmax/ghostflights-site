@@ -52,14 +52,20 @@
   .wx .temp { font: 30px/1 CG, sans-serif; color: #1d1a16; background: #f7f0de; padding: 5px 7px 2px; border-radius: 3px; }
   .light { position: absolute; inset: 0; mix-blend-mode: multiply; pointer-events: none;
     background: radial-gradient(ellipse 80% 75% at 46% 44%, #fffdf8 0%, #fbf1e1 50%, #c3a482 100%); }
-  canvas.cg { position: absolute; inset: 0; width: 1440px; height: 1080px; image-rendering: pixelated; filter: url(#key); }
+  canvas.cg { position: absolute; inset: 0; width: 1440px; height: 1080px; }
   /* The crawl, the only thing that moves every frame, on a strip of its own: the key filter reruns on it alone. */
   /* A break-in: a whole-frame card from the character generator, over the picture for a few seconds. */
-  canvas.card { position: absolute; inset: 0; width: 1440px; height: 1080px; image-rendering: pixelated; filter: url(#key); display: none; }
+  canvas.card { position: absolute; inset: 0; width: 1440px; height: 1080px; display: none; }
   /* The plane-spotting card's plane, over the card, big. */
   img.cardplane { position: absolute; left: 120px; top: 330px; width: 1200px; display: none; pointer-events: none;
     filter: url(#tape) drop-shadow(10px 14px 6px rgba(10, 8, 30, 0.5)); }
-  canvas.crawl { position: absolute; left: 0; top: 1008px; width: 1440px; height: 60px; image-rendering: pixelated; filter: url(#key); }
+  /* The crawl: its band, still and keyed like the other layers, and over it the moving text, rendered once into tiles
+     with its key drawn in and slid along by a transform: moving it never repaints or re-filters anything (redrawn and
+     filtered twenty times a second, it kept a laptop warm). */
+  canvas.crawl { position: absolute; left: 0; top: 1008px; width: 1440px; height: 60px; }
+  .crawlwin { position: absolute; left: 0; top: 1008px; width: 1440px; height: 60px; overflow: hidden; pointer-events: none; }
+  .crawlstrip { position: absolute; left: 0; top: 0; height: 60px; display: flex; will-change: transform; }
+  .crawlstrip canvas { flex: none; height: 60px; }
   .scan { position: absolute; inset: 0; pointer-events: none;
     background: repeating-linear-gradient(0deg, rgba(0,0,0,0.09) 0 1px, transparent 1px 3px); }
 </style>
@@ -96,9 +102,10 @@
     <div class="wx"></div>
   </div></div>
   <div class="light"></div>
-  <canvas class="cg" width="480" height="360"></canvas>
-  <canvas class="crawl" width="480" height="20"></canvas>
-  <canvas class="card" width="480" height="360"></canvas>
+  <canvas class="cg" width="1440" height="1080"></canvas>
+  <canvas class="crawl" width="1440" height="60"></canvas>
+  <div class="crawlwin"><div class="crawlstrip"></div></div>
+  <canvas class="card" width="1440" height="1080"></canvas>
   <img class="cardplane" alt="">
   <div class="scan"></div>
 </div></div>
@@ -360,10 +367,34 @@
     return following;
   }
 
-  // The character generator, at its own resolution, every pixel on or off.
-  const cg = document.querySelector('canvas.cg');
-  const cgCtx = cg.getContext('2d', { willReadFrequently: true });
-  const crawlCtx = document.querySelector('canvas.crawl').getContext('2d', { willReadFrequently: true });
+  // The character generator, at its own resolution (480 lines), every pixel on or off, drawn off screen; then keyed
+  // onto the screen's canvases at the frame's size whenever it changes (keyInto). Not a filter on the screen's canvases:
+  // a filter there was re-run on every frame the page drew (the crawl's twenty a second), and warmed a laptop.
+  const offscreen = (w, h) => Object.assign(document.createElement('canvas'), { width: w, height: h }).getContext('2d', { willReadFrequently: true });
+  const cgCtx = offscreen(480, 360), crawlCtx = offscreen(480, 20);
+  const cgOut = document.querySelector('canvas.cg').getContext('2d'), bandOut = document.querySelector('canvas.crawl').getContext('2d');
+  // The key, as the #key filter did it: the picture a little smeared, red shifted right, green, blue shifted left.
+  const tints = {};
+  function keyInto(src, sx, sy, sw, sh, out) {
+    const w = sw * 3, h = sh * 3, k = `${w}x${h}`;
+    const tint = (tints[k] ||= offscreen(w, h));
+    out.clearRect(0, 0, w, h);
+    for (const [color, dx] of [['#ff0000', 2], ['#00ff00', 0], ['#0000ff', -1.5]]) {
+      tint.globalCompositeOperation = 'copy';
+      tint.imageSmoothingEnabled = false;
+      tint.filter = 'blur(0.6px)';
+      tint.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+      tint.filter = 'none';
+      tint.globalCompositeOperation = 'multiply';
+      tint.fillStyle = color;
+      tint.fillRect(0, 0, w, h);
+      tint.globalCompositeOperation = 'destination-in';
+      tint.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+      out.globalCompositeOperation = 'lighter';
+      out.drawImage(tint.canvas, dx, 0);
+    }
+    out.globalCompositeOperation = 'source-over';
+  }
   let ctx = Channel.cg.use(cgCtx); // the canvas block() and text() draw on, set with draw()
   const draw = (c) => (ctx = Channel.cg.use(c));
   const { WHITE, AMBER, BAND } = Channel.cg, CRAWL = Channel.cg.DEEP;
@@ -558,6 +589,7 @@
         ctx.fillStyle = AMBER; ctx.fill();
       }
       finish(cgCtx);
+      keyInto(cgCtx.canvas, 0, 0, 480, 360, cgOut);
     }
     drawCrawl(t, activeKey);
   }
@@ -566,17 +598,68 @@
   // The crawl, moving left at a steady 40 of its pixels a second: this board's flights, or during the weather the
   // cities' conditions.
   function drawCrawl(t, activeKey) {
-    draw(crawlCtx);
-    ctx.clearRect(0, 0, 480, 20);
-    block(0, 0, 480, 18, CRAWL);
-    block(0, 0, 480, 1, AMBER);
+    if (!crawlBand) {
+      // The band, once.
+      draw(crawlCtx);
+      ctx.clearRect(0, 0, 480, 20);
+      block(0, 0, 480, 18, CRAWL);
+      block(0, 0, 480, 1, AMBER);
+      finish(crawlCtx);
+      keyInto(crawlCtx.canvas, 0, 0, 480, 20, bandOut);
+      crawlBand = true;
+    }
+    const key = `${crawl.for}|${crawl.start}`;
+    if (strip.for !== key) renderStrip(key);
+    if (strip.active !== activeKey) {
+      const was = strip.active;
+      strip.active = activeKey;
+      for (const k of [was, activeKey]) if (k) rekey(strip.spans[k]); // only the tiles the old and new item are on
+    }
+    stripEl.style.transform = `translate3d(${Math.round(crawlX(t) * 3)}px, 0, 0)`;
+  }
+
+  // The crawl's text, the whole line at the character generator's 480 lines, then keyed into tiles at the frame's
+  // size (red shifted right, green, blue shifted left, a little smeared, as the #key filter does for the still layers).
+  const stripEl = document.querySelector('.crawlstrip'), TILE = 1365; // a tile's 480-line width: 4,095 px on screen
+  let crawlBand = false, strip = { for: '', active: null, spans: {}, line: null, tiles: [] };
+  function renderStrip(key) {
+    const width = Math.max(1, Math.ceil(crawl.total));
+    const line = Object.assign(document.createElement('canvas'), { width, height: 20 }).getContext('2d', { willReadFrequently: true });
+    const spans = {};
+    let x = 0;
+    crawl.items.forEach((it, i) => { if (it.key) spans[it.key] = [x, x + crawl.widths[i]]; x += crawl.widths[i]; });
+    stripEl.replaceChildren();
+    const tiles = [];
+    for (let at = 0; at < width; at += TILE) {
+      const c = Object.assign(document.createElement('canvas'), { width: Math.min(TILE, width - at) * 3, height: 60 });
+      stripEl.append(c);
+      tiles.push(c.getContext('2d'));
+    }
+    strip = { for: key, active: crawlActive(now()), spans, line, tiles, width };
+    paintLine(0, width);
+    tiles.forEach((_, i) => keyTile(i));
+  }
+  // The line's text between two of its x's, each item lit or not.
+  function paintLine(from, to) {
+    draw(strip.line);
+    ctx.clearRect(from, 0, to - from, 20);
     const lit = crawl.items.length && crawl.items[0].lit;
-    let x = crawlX(t);
+    let x = 0;
     crawl.items.forEach((it, i) => {
-      if (x < 480 && x + crawl.widths[i] > 0) text(`${it.text}   •   `, x, 14, 12, lit || (it.key && it.key === activeKey) ? AMBER : WHITE);
+      if (x < to && x + crawl.widths[i] > from) text(`${it.text}   •   `, x, 14, 12, lit || (it.key && it.key === strip.active) ? AMBER : WHITE);
       x += crawl.widths[i];
     });
-    finish(crawlCtx);
+    finish(strip.line);
+  }
+  function rekey(span) {
+    if (!span) return;
+    const from = Math.floor(span[0] / TILE) * TILE, to = Math.min(strip.width, Math.ceil(span[1] / TILE) * TILE);
+    paintLine(from, to);
+    for (let i = from / TILE; i * TILE < to; i++) keyTile(i);
+  }
+  function keyTile(i) {
+    const out = strip.tiles[i];
+    keyInto(strip.line.canvas, i * TILE, 0, out.canvas.width / 3, 20, out);
   }
 
 
@@ -636,8 +719,12 @@
     baked.set(src, await cutout(img, 260));
   }
   const big = (src) => bakedBig.get(src) || baked.get(src);
+  // The big ones (the card and the break), one at a time when the page is idle, not in one long block at the start.
   async function bakeBig(srcs) {
-    for (const src of srcs) if (drawings.has(src)) bakedBig.set(src, await cutout(drawings.get(src), 600));
+    for (const src of srcs) {
+      await new Promise((r) => (window.requestIdleCallback || setTimeout)(r));
+      if (drawings.has(src)) bakedBig.set(src, await cutout(drawings.get(src), 600));
+    }
   }
 
   let cam = WIDE;
@@ -673,7 +760,7 @@
   }
 
   const cardEl = document.querySelector('canvas.card'), cardPlane = document.querySelector('img.cardplane');
-  const cardCtx = cardEl.getContext('2d', { willReadFrequently: true });
+  const cardCtx = offscreen(480, 360), cardOut = cardEl.getContext('2d');
   let cardFor = '';
   function drawBreak(t, br) {
     const key = br ? `${br.n}:${br.kind}` : '';
@@ -763,6 +850,7 @@
       text(`Channel ${CH}`, 240, 326, 12, AMBER, 'center');
     }
     finish(cardCtx);
+    keyInto(cardCtx.canvas, 0, 0, 480, 360, cardOut);
     return true;
   }
 
@@ -784,7 +872,9 @@
 
   new FontFace('CG', `url(${window.CG_FONT})`).load().then(async (font) => {
     document.fonts.add(font);
-    const sprites = Object.values(B.airlines).flatMap((a) => Object.values(a.fleet).flatMap((t) => t.paints || [t]).flatMap((f) => [`sprites/${f.sprite}-left.svg`, `sprites/${f.sprite}-right.svg`]));
+    // This board's airline's planes only (each channel flies its own airline), not every airline's.
+    const airlines = BD.airline ? [B.airlines[BD.airline]] : Object.values(B.airlines);
+    const sprites = airlines.flatMap((a) => Object.values(a.fleet).flatMap((t) => t.paints || [t]).flatMap((f) => [`sprites/${f.sprite}-left.svg`, `sprites/${f.sprite}-right.svg`]));
     // A cutout that won't bake shows its plain drawing rather than stop the broadcast.
     await Promise.all(sprites.map((src) => bake(src).catch(() => baked.set(src, window.SPRITES[src]))));
     bakeBig(sprites.filter((s) => s.endsWith('-left.svg'))); // the card and the break only show the left side

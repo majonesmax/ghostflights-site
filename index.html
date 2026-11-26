@@ -15,14 +15,17 @@
       radial-gradient(1px 1px at 78% 27%, #fff6 50%, transparent 51%), radial-gradient(1.5px 1.5px at 90% 9%, #fff9 50%, transparent 51%),
       radial-gradient(1px 1px at 6% 35%, #fff5 50%, transparent 51%), radial-gradient(1px 1px at 55% 33%, #fff5 50%, transparent 51%); }
   .land { position: fixed; left: 0; right: 0; bottom: 0; width: 100%; height: 30%; display: block; }
-  .sky-plane { position: fixed; top: 12%; left: -10%; width: 220px; height: 3px; animation: fly 40s linear infinite; }
+  /* A plane goes over now and then, not all the time: flying, it has the page drawn sixty times a second, and every
+     one of those re-composites the set's filtered picture (it was most of what warmed a laptop). */
+  .sky-plane { position: fixed; top: 12%; left: -10%; width: 220px; height: 3px; display: none; }
+  .sky-plane.flying { display: block; animation: fly 40s linear 1 forwards; }
   .sky-plane::before { content: ""; position: absolute; right: 0; top: -3px; width: 8px; height: 8px; border-radius: 50%;
     background: #ff6b5b; box-shadow: 0 0 12px 4px #ff6b5b88; animation: blink 1.2s steps(1) infinite; }
   .sky-plane::after { content: ""; position: absolute; inset: 0 8px 0 0; border-radius: 2px;
     background: linear-gradient(90deg, transparent, #f7c98b55 70%, #fff3e0aa); }
   @keyframes fly { from { transform: translate(0, 0); } to { transform: translate(125vw, -60px); } }
   @keyframes blink { 50% { opacity: 0.25; } }
-  @media (prefers-reduced-motion: reduce) { .sky-plane { animation: none; left: 70%; } .sky-plane::before { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .sky-plane.flying { display: none; } }
   /* The set: a wood cabinet, the screen's dark bezel, and under it the maker's badge, the speaker and two knobs. Sizes
      in em of the cabinet's font size, which fit() sets from the screen's width. */
   .cabinet { position: absolute; border-radius: 0.9em; box-shadow: 0 1.4em 3em rgba(10, 6, 20, 0.6), inset 0 0.08em 0 rgba(255, 230, 200, 0.25), inset 0 -0.15em 0 rgba(0, 0, 0, 0.35);
@@ -96,6 +99,16 @@
 <body>
 <div class="stars" aria-hidden="true"></div>
 <div class="sky-plane" aria-hidden="true"></div>
+<script>
+  // The plane overhead: a pass 20 seconds in, then one every four minutes.
+  (() => {
+    const plane = document.querySelector('.sky-plane');
+    const pass = () => plane.classList.add('flying');
+    plane.addEventListener('animationend', (e) => { if (e.animationName === 'fly') plane.classList.remove('flying'); });
+    setTimeout(pass, 20000);
+    setInterval(pass, 240000);
+  })();
+</script>
 <svg class="land" viewBox="0 0 1440 300" preserveAspectRatio="none" aria-hidden="true">
   <path fill="#8b5a73" fill-opacity="0.75" d="M0 150 C120 120 210 140 320 118 C430 96 520 128 640 110 C760 92 860 126 980 104 C1100 84 1220 120 1320 102 C1380 92 1420 100 1440 96 V300 H0Z"/>
   <path fill="#55395a" d="M0 196 C60 184 110 192 170 176 C200 168 230 186 270 180 C330 170 380 190 450 182 C520 172 560 158 600 170 C660 186 720 176 800 182 C880 188 930 166 990 172 C1060 180 1110 190 1180 178 C1250 166 1310 184 1380 176 C1410 172 1430 176 1440 178 V300 H0Z"/>
