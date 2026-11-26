@@ -142,8 +142,12 @@
 <script>
   // The set. It tunes the station (station.html?ch=…) in its screen, draws its own on-screen display, plays the music
   // and has two knobs: channel and volume. ?ch= picks the channel; ?t= and ?speed= pass through to the station.
-  // The channels: 0 the guide (guide.html), then an airline each (data/boards.json, its numbered boards).
-  const CHS = ['0', ...Object.keys(window.BOARD_CHANNELS || {})];
+  // The channels: 0 the guide (guide.html), then an airline each (data/boards.json, its numbered boards), then
+  // Skyarium Presents (presents.html), the viewers' slides, last.
+  const AIRLINE_CHS = Object.keys(window.BOARD_CHANNELS || {});
+  const PRESENTS = String(Math.max(0, ...AIRLINE_CHS.map(Number)) + 1);
+  const CHS = ['0', ...AIRLINE_CHS, PRESENTS];
+  const page = (c) => (c === '0' ? 'guide' : c === PRESENTS ? 'presents' : 'station');
   const params = new URLSearchParams(location.search);
   const set = document.querySelector('.set'), screen = set.querySelector('iframe');
   const channelKnob = document.querySelector('.knob.channel'), volumeKnob = document.querySelector('.knob.volume');
@@ -196,7 +200,7 @@
     if (!snowing) { snowing = true; hiss(); }
     osd(chName(ch), 60000);
     Muzak.tune(ch); // the music cuts to static until the picture is in
-    screen.src = window.PHONE ? `phone.html?ch=${ch}` : `${ch === '0' ? 'guide' : 'station'}.html?${q}`;
+    screen.src = window.PHONE ? `phone.html?ch=${ch}` : `${page(ch)}.html?${q}`;
   }
   function tunedIn() {
     clearTimeout(watchdog);
@@ -243,7 +247,7 @@
   function across() {
     const t = clockNow(), slot = Math.floor((t - ACROSS.at + ACROSS.early) / ACROSS.every);
     const into = t - (slot * ACROSS.every + ACROSS.at); // ms into this slot's segment (negative while loading)
-    const want = ch !== '0' && into > -ACROSS.early && into < ACROSS.length ? `${ch}:${slot}` : '';
+    const want = ch !== '0' && ch !== PRESENTS && into > -ACROSS.early && into < ACROSS.length ? `${ch}:${slot}` : '';
     if (want !== acrossFor) {
       acrossFor = want; acrossReady = false;
       const turns = (window.BOARD_ACROSS || {})[ch] || [[`N${ch}`, 'Across the country']];

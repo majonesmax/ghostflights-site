@@ -147,6 +147,16 @@
       text(`Next hour ${next.count} departures. Weather every few minutes.`, 88, y + 45, 9, QUIET);
       y += ROW;
     }
+    { // the last channel isn't an airline's: the viewers' slides
+      const ch = String(Math.max(...Object.keys(DATA.boards).filter((c) => /^\d+$/.test(c)).map(Number)) + 1);
+      block(24, y + 4, 432, ROW - 6, BAND);
+      block(24, y + 4, 54, ROW - 6, AMBER);
+      text(`CH ${ch}`, 51, y + 32, 16, DEEP, 'center');
+      text('Skyarium Presents', 88, y + 20, 15, WHITE);
+      text('Your slides of the airlines from airports all over.', 88, y + 34, 10, AMBER);
+      text('Sent in by viewers. More every week.', 88, y + 45, 9, QUIET);
+      y += ROW;
+    }
     y += 8;
     for (const [label, words] of CREDITS) {
       const lines = wrap(words, 10, 340);

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ghostflights · Skyarium Presents</title>
+<style>
+  @font-face { font-family: CG; src: url(fonts/cg.ttf) format('truetype'); }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  .stage { position: absolute; left: 50%; top: 50%; width: 1440px; height: 1080px; transform-origin: 0 0; }
+  .frame { position: relative; width: 1440px; height: 1080px; overflow: hidden; background: #000; }
+  /* The slide, slowly drifting in like a camera on a slide on an easel; two of them so one fades into the next. */
+  img.slide { position: absolute; inset: 0; width: 1440px; height: 1080px; opacity: 0; filter: url(#tape);
+    transition: opacity 1.2s linear; will-change: transform, opacity; }
+  img.slide.on { opacity: 1; }
+  canvas { position: absolute; left: 0; width: 1440px; image-rendering: pixelated; }
+  canvas.cg { top: 0; height: 1080px; filter: url(#key); }
+  canvas.card { top: 0; height: 1080px; filter: url(#key); display: none; }
+  .crawlwin { position: absolute; left: 0; top: 1008px; width: 1440px; height: 60px; overflow: hidden; background: #16205a; }
+  .crawlstrip { position: absolute; left: 0; top: 0; height: 60px; will-change: transform; }
+  .crawlstrip canvas { position: static; display: block; height: 60px; width: auto; }
+  .light { position: absolute; inset: 0; mix-blend-mode: multiply; pointer-events: none;
+    background: radial-gradient(ellipse 80% 75% at 46% 44%, #ffffff 0%, #eef0ff 55%, #9aa0c4 100%); }
+  .scan { position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.12) 0 1px, transparent 1px 3px); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="tape" x="0" y="0" width="100%" height="100%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="0.6"/>
+  </filter>
+  <filter id="key" x="-2%" y="-2%" width="104%" height="104%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.3 0.35" result="smear"/>
+    <feColorMatrix in="smear" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+    <feOffset in="r" dx="2" result="r2"/>
+    <feColorMatrix in="smear" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+    <feColorMatrix in="smear" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+    <feOffset in="b" dx="-1.5" result="b2"/>
+    <feComposite in="r2" in2="g" operator="arithmetic" k2="1" k3="1" result="rg"/>
+    <feComposite in="rg" in2="b2" operator="arithmetic" k2="1" k3="1" result="rgb"/>
+    <feGaussianBlur in="rgb" stdDeviation="3" result="glow"/>
+    <feComposite in="glow" in2="rgb" operator="arithmetic" k2="0.25" k3="1"/>
+  </filter>
+</svg>
+<div class="stage"><div class="frame">
+  <img class="slide" alt=""><img class="slide" alt="">
+  <canvas class="cg" width="480" height="360"></canvas>
+  <canvas class="card" width="480" height="360"></canvas>
+  <div class="crawlwin"><div class="crawlstrip"></div></div>
+  <div class="light"></div>
+  <div class="scan"></div>
+</div></div>
+<script src="slides.js"></script>
+<script src="sponsors.js"></script>
+<script src="channel.js"></script>
+<script>
+  // Skyarium Presents: viewers' slides of the airlines, a 1985 "planespotters" on TV. Each slide is an Open Liveries
+  // scheme on its measured 3D model, posed over a painted airport (tools/slides/), with its caption set by the
+  // character generator. More sponsors than the other channels, and a crawl of Skyarium's own plugs. It runs inside
+  // the set (index.html) as the last channel.
+  const { toSet, now } = Channel;
+  const { block, text, wrap, finish, WHITE, AMBER, BAND, DEEP } = Channel.cg;
+  const CH = Channel.params.get('ch') || '18';
+  const SLIDE_MS = 16000, CARD_MS = 9000, PER_CARDS = 3; // three slides, then a word from a sponsor
+  const CYCLE = PER_CARDS * SLIDE_MS + CARD_MS;
+  const SLIDES = window.SLIDES;
+  const hash = (s) => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h; };
+  // The slides in a different order each day, so the channel doesn't repeat the same run at the same hour.
+  const order = (day) => SLIDES.map((s, i) => [hash(`${day}:${s.id}`), i]).sort((a, b) => a[0] - b[0]).map(([, i]) => i);
+
+  // Every sponsor on the station, and two of this channel's own: Skyarium, and the slides it's asking for.
+  const SPONSORS = [
+    ...Object.values(window.SPONSORS).flat().filter((s) => s.icon !== 'sky'),
+    { name: 'Skyarium', icon: 'sky', lines: ['Look up from wherever you are.', 'It puts a name to every plane above you.'], where: 'For your telephone. skyarium.app', bg: '#141838', ink: '#f7c98b' },
+    { name: 'Your slides here', icon: 'sky', lines: ['Send us your best airport slides.', 'Every one comes back to you.'], where: 'Skyarium Presents', phone: '555-0186', bg: '#1d1a2e', ink: '#ffbf2e' },
+  ];
+
+  // What's on at moment t: a slide (which one, and how far into it) or a sponsor's card.
+  function at(t) {
+    const n = Math.floor(t / CYCLE), into = t - n * CYCLE, day = Math.floor(t / 86400000);
+    if (into >= PER_CARDS * SLIDE_MS) return { kind: 'card', n, sponsor: SPONSORS[hash(`card:${n}`) % SPONSORS.length] };
+    const k = n * PER_CARDS + Math.floor(into / SLIDE_MS), o = order(day);
+    return { kind: 'slide', k, slide: SLIDES[o[k % o.length]], start: t - (into % SLIDE_MS) };
+  }
+
+  const stage = document.querySelector('.stage');
+  function fit() {
+    const s = Math.min(innerWidth / 1440, innerHeight / 1080);
+    stage.style.transform = `scale(${s}) translate(-720px, -540px)`;
+  }
+  addEventListener('resize', fit);
+  fit();
+
+  // The two slides: the next one loads, then fades up over the last, drifting a little one way or the other.
+  const imgs = [...document.querySelectorAll('img.slide')];
+  let front = 0, showing = '';
+  async function showSlide(w) {
+    if (showing === `${w.k}`) return;
+    showing = `${w.k}`;
+    const img = imgs[1 - front];
+    img.src = `slides/${w.slide.id}.webp`;
+    try { await img.decode(); } catch { return; }
+    const left = w.k % 2 ? 1 : -1, elapsed = Math.max(0, now() - w.start);
+    img.style.transition = 'none';
+    img.style.transform = `scale(1.0) translate(${left * 4}px, 0)`;
+    img.getBoundingClientRect();
+    img.style.transition = `opacity 1.2s linear, transform ${(SLIDE_MS - elapsed) / 1000}s linear`;
+    img.style.transform = `scale(1.04) translate(${-left * 10}px, -4px)`;
+    img.classList.add('on'); imgs[front].classList.remove('on');
+    front = 1 - front;
+  }
+
+  // The character generator: the bug, and the slide's caption on a band low on the screen.
+  const cg = document.querySelector('canvas.cg'), cgx = cg.getContext('2d');
+  function drawCaption(w) {
+    Channel.cg.use(cgx); cgx.clearRect(0, 0, 480, 360);
+    text('Ghostflights', 18, 24, 12, AMBER);
+    text(`Ch ${CH} · Skyarium Presents`, 18, 39, 12, WHITE);
+    if (w.kind === 'slide') {
+      const [title, line, credit] = w.slide.caption;
+      block(0, 270, 480, 62, 'rgba(10,12,34,0.82)');
+      block(0, 270, 480, 2, AMBER);
+      text(title, 18, 290, 14, AMBER);
+      text(line, 18, 307, 10, WHITE);
+      text(credit, 18, 322, 8, '#c9cbe6');
+    }
+    finish(cgx);
+  }
+
+  // A sponsor's card, as the airline channels set them.
+  const card = document.querySelector('canvas.card'), cx = card.getContext('2d');
+  function drawCard(s) {
+    Channel.cg.use(cx);
+    block(0, 0, 480, 360, s.bg);
+    text('Skyarium Presents is brought to you by', 240, 44, 11, WHITE, 'center');
+    cx.save(); cx.translate(240, 92); cx.scale(1.3, 1.3); (window.SPONSOR_ICONS[s.icon] || (() => {}))(cx, s.ink); cx.restore();
+    block(60, 128, 360, 2, s.ink);
+    text(s.name, 240, 168, 32, s.ink, 'center');
+    block(60, 182, 360, 2, s.ink);
+    s.lines.forEach((l, i) => text(l, 240, 212 + i * 21, 14, WHITE, 'center'));
+    text(s.where, 240, 268, 12, s.ink, 'center');
+    if (s.phone) text(`Call ${s.phone}`, 240, 306, 18, WHITE, 'center');
+    finish(cx);
+  }
+
+  // The crawl: the weather across the country, this hour on this date in 1985 (Open-Meteo's archive of the ERA5
+  // reanalysis, CC BY 4.0, as the airline channels have it; never made up), at the slides' airports, with a short
+  // word from Skyarium about every 35 seconds. Drawn into a strip that slides; drawn again when the hour turns.
+  const WX = [['New York', 40.64, -73.78], ['Chicago', 41.79, -87.75], ['Dallas', 32.9, -97.04], ['Houston', 29.98, -95.34],
+    ['Miami', 25.79, -80.29], ['Minneapolis', 44.88, -93.22], ['St. Louis', 38.75, -90.37], ['Pittsburgh', 40.49, -80.23],
+    ['Charlotte', 35.21, -80.94], ['Salt Lake City', 40.79, -111.98], ['San Diego', 32.73, -117.19]];
+  const PLUGS = [
+    'Skyarium names every plane over your house',
+    'Look up with Skyarium. It\'s free',
+    'Old airlines fly again at night in Skyarium',
+    'Tap a plane in Skyarium to spin it in 3D',
+    'Get Skyarium on the App Store',
+  ];
+  const sky = (code) => (code <= 1 ? 'clear' : code === 2 ? 'partly cloudy' : code === 45 || code === 48 ? 'fog'
+    : (code >= 71 && code <= 77) || code === 85 || code === 86 ? 'snow' : code >= 95 ? 'thunderstorms' : code >= 61 ? 'rain' : code >= 51 ? 'drizzle' : 'cloudy');
+  const TZ = 'America/Chicago';
+  const local = new Intl.DateTimeFormat('en-US', { timeZone: TZ, month: 'numeric', day: 'numeric', hour: 'numeric', hourCycle: 'h23' });
+  const parts = (t) => Object.fromEntries(local.formatToParts(new Date(t)).map((x) => [x.type, +x.value]));
+  const thenDate = (t) => { const { month, day } = parts(t); return `1985-${String(month).padStart(2, '0')}-${String(Math.min(day, month === 2 ? 28 : 31)).padStart(2, '0')}`; };
+  const days = {};
+  async function weatherAt(t) {
+    const date = thenDate(t);
+    if (!days[date]) {
+      days[date] = fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${WX.map((c) => c[1])}&longitude=${WX.map((c) => c[2])}`
+        + `&start_date=${date}&end_date=${date}&hourly=temperature_2m,weather_code,is_day&temperature_unit=fahrenheit&timezone=${encodeURIComponent(TZ)}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status))).then((j) => j.map((c) => c.hourly))
+        .catch(() => { delete days[date]; return null; });
+    }
+    const hours = await days[date], h = parts(t).hour;
+    if (!hours) return null;
+    return WX.map(([name], i) => `${name} ${Math.round(hours[i].temperature_2m[h])}° ${sky(hours[i].weather_code[h])}`);
+  }
+
+  const PX_S = 34; // pixels of the 480-wide screen a second
+  const strip = document.querySelector('.crawlstrip');
+  let stripHour = '', stripW = 1;
+  async function buildCrawl(t) {
+    const hour = `${thenDate(t)}T${parts(t).hour}`;
+    if (hour === stripHour) return;
+    const wx = await weatherAt(t);
+    if (!wx && stripHour) return; // keep the last one rather than lose the weather
+    stripHour = wx ? hour : '';
+    await document.fonts.load('14px CG');
+    const g0 = document.createElement('canvas').getContext('2d'); g0.font = '14px CG';
+    const w = (str) => g0.measureText(str.toUpperCase()).width;
+    // weather items until about 35 seconds have gone by, then a plug, round the plugs
+    const items = [];
+    const when = new Date(`${thenDate(t)}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    for (const plug of PLUGS) {
+      let run = 0;
+      if (wx) {
+        items.push({ s: `Weather ${when}`, c: AMBER }); run += w(`Weather ${when}`) + 30;
+        for (let k = 0; run < PX_S * 35; k++) { const it = wx[k % wx.length]; items.push({ s: it, c: WHITE }); run += w(it) + 30; }
+      }
+      items.push({ s: plug, c: AMBER });
+    }
+    const SEP = '  ·  ', sepW = w(SEP);
+    const total = Math.ceil(items.reduce((a, it) => a + w(it.s) + sepW, 0)) + 2;
+    strip.replaceChildren();
+    for (let copy = 0; copy < 2; copy++) { // two copies end to end, so the loop has no seam
+      const c = document.createElement('canvas'); c.width = total; c.height = 20;
+      const g = Channel.cg.use(c.getContext('2d'));
+      let x = 0;
+      for (const it of items) { text(it.s, x, 15, 14, it.c); x += w(it.s); text(SEP, x, 15, 14, WHITE); x += sepW; }
+      finish(g);
+      c.style.width = `${total * 3}px`;
+      strip.appendChild(c);
+    }
+    strip.style.width = `${total * 6}px`;
+    stripW = total;
+  }
+  const tick = () => { strip.style.transform = `translateX(${-(((now() / 1000) * PX_S) % stripW) * 3}px)`; };
+  setInterval(tick, 50);
+  buildCrawl(now());
+  setInterval(() => buildCrawl(now()), 60000);
+
+  let last = '';
+  async function frame() {
+    const w = at(now());
+    const key = w.kind === 'card' ? `card:${w.n}` : `slide:${w.k}`;
+    if (key !== last) {
+      last = key;
+      if (w.kind === 'card') { drawCard(w.sponsor); card.style.display = 'block'; }
+      else { card.style.display = 'none'; await showSlide(w); }
+      drawCaption(w);
+    }
+  }
+  (async () => {
+    await document.fonts.load('14px CG');
+    await frame();
+    toSet({ ready: CH });
+    setInterval(frame, 250);
+  })();
+</script>
+</body>
+</html>
