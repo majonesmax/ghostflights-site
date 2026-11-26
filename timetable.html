@@ -205,10 +205,13 @@
     for (const [code, p] of Object.entries(P)) { const m = miles(p, at); if (m < best) { best = m; near = code; } }
     const by = best < 8 ? `over ${city(near)}` : `${Math.round(best / 5) * 5 || 5} miles ${compass(P[near], at)} of ${city(near)}`;
     // Far from any of the station's cities, the country it's over (the north of a big one, up there).
+    // Over land a city names the place out to 500 miles ("340 miles northwest of Juneau" says more than "Over Canada");
+    // farther than that, the country, or Alaska, or the north of a big one.
     const land = L.names[country - 1] || 'land', north = at[0] > 58 && ['Canada', 'the Soviet Union'].includes(land);
-    const far = north ? land.replace(/^(the )?/, (the) => `${the}northern `) : land;
+    const alaska = land === 'the United States' && at[0] > 51 && at[1] < -129;
+    const far = alaska ? 'Alaska' : north ? land.replace(/^(the )?/, (the) => `${the}northern `) : land;
     const words = !onLand ? `Over ${water(at[0], at[1])}${best < 200 ? `, ${by.replace(/^over /, 'off ')}` : ''}`
-      : best < 200 ? `Now ${by}` : `Over ${far}`;
+      : best < 500 ? `Now ${by}` : `Over ${far}`;
     // A ghost in Skyarium tonight: leaving from 9 p.m. or landing by 7 a.m. at its origin's clock, and over land near a city.
     const A = D.airlines[f.airline], r = A.schedule.find((x) => x[0] === f.number && x[1] === f.from && x[2] === f.to);
     const night = r && (r[3] >= 21 * 60 || (r[3] + r[5]) % 1440 <= 7 * 60);
