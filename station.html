@@ -522,8 +522,11 @@
   // across) is the one featured, its words in yellow and its plane drawn large on the board under the pointer. Each
   // shot starts the crawl fresh with its own flights. A plane clicked is the crawl's alone, its details and source;
   // landed, the crawl says so. During the weather, the cities' conditions.
+  // A new shot doesn't restart it: what's on screen runs on and the shot's flights follow, the ones featured longest
+  // ago (or never) first, so a cut doesn't bring the same flight round again.
   const READ_X = 150, CRAWL_SPEED = 26; // the character generator's pixels, and its pixels a second (an unhurried read)
   let crawl = { for: '', items: [], start: 0, widths: [], total: 0 };
+  const featured = new Map(); // a flight's key → when it was last featured
   function crawlItems(t, cam, weatherUp, pf, arrived) {
     if (weatherUp) return [{ text: `${thenLabel(t)}   •   ` + weather.map((w) => `${city(w.code)} ${w.temp} ${SKY_WORDS[w.sky]}`).join('   •   ') + `   •   Weather of ${YEAR} by Open-Meteo.com from ERA5` }];
     const who = (g) => `${short(g)} ${g.number}`;
@@ -533,7 +536,9 @@
       return [{ key: pf.key, lit: true, text: `${who(pf)} · ${pf.fleet.name} · ${city(pf.from)} to ${city(pf.to)} · ${phase(pf).toLowerCase()} · ` +
         `from the ${source}. Times as printed, the flight simulated` }];
     }
-    const here = flights.filter((g) => onScreen(g, cam) && (!focus || g.airline === focus)).sort((x, y) => x.key.localeCompare(y.key));
+    const order = (g) => hash(`${lastCam}:${g.key}`) / 4294967296; // ties shuffled differently each shot
+    const here = flights.filter((g) => onScreen(g, cam) && (!focus || g.airline === focus))
+      .sort((x, y) => (featured.get(x.key) ?? -1) - (featured.get(y.key) ?? -1) || order(x) - order(y));
     // On an airline's channel its name goes without saying: the flight, its type, the route and its altitude.
     const line = (g) => (BD.airline
       ? `Flt ${g.number} · ${g.fleet.name} · ${city(g.from)}–${city(g.to)} · ${altK(g)}`
@@ -558,13 +563,31 @@
     const weatherUp = cam.weather && weather;
     const which = `${lastCam}|${cam.name}|${weatherUp ? weatherHour : ''}|${pf ? pf.key : ''}|${arrived ? arrived.key : ''}`;
     if (crawl.for !== which) {
-      const items = crawlItems(t, cam, weatherUp, pf, arrived);
+      let items = crawlItems(t, cam, weatherUp, pf, arrived);
       draw(crawlCtx); ctx.font = '12px CG';
-      const widths = items.map((it) => ctx.measureText(`${it.text}   •   `.toUpperCase()).width);
-      crawl = { for: which, items, start: t, widths, total: widths.reduce((s, w) => s + w, 0) };
+      const width = (it) => ctx.measureText(`${it.text}   •   `.toUpperCase()).width;
+      // A plain list after a plain list runs on: the items still on screen keep their place, the new ones behind.
+      const plain = (list) => list.length && !list[0].lit && !weatherUp && !list[0].text.includes('Open-Meteo');
+      let start = t;
+      if (plain(items) && plain(crawl.items) && !crawl.weather) {
+        let x = crawlX(t);
+        const carry = [];
+        for (let i = 0; i < crawl.items.length; i++) {
+          if (x + crawl.widths[i] > 0 && x < 480) { if (!carry.length) start = t - ((READ_X - x) * 1000 * SPEED) / CRAWL_SPEED; carry.push(crawl.items[i]); }
+          x += crawl.widths[i];
+        }
+        // Between loops (nothing on screen) the new ones come in from the right edge, as the crawl comes round.
+        if (!carry.length) start = t - ((READ_X - 480) * 1000 * SPEED) / CRAWL_SPEED;
+        const keys = new Set(carry.map((it) => it.key));
+        items = [...carry, ...items.filter((it) => !it.key || !keys.has(it.key))];
+      }
+      const widths = items.map(width);
+      crawl = { for: which, items, start, widths, total: widths.reduce((s, w) => s + w, 0), weather: !!weatherUp };
     }
     const activeKey = crawlActive(t);
-    const f = (activeKey && flights.find((g) => g.key === activeKey)) || null;
+    // Featured only if it's in this shot: a flight carried over from the last one may not be.
+    const f = (activeKey && flights.find((g) => g.key === activeKey && (pf || arrived || onScreen(g, cam)))) || null;
+    if (f) featured.set(f.key, t);
     const titled = weatherUp && (t % CUT) - (CUT - WEATHER_LEN) < 6000;
     const key = [cam.name, clock.format(new Date(t)), f ? `${f.key}|${lastStep}` : '', weatherUp ? `${weatherHour}|${titled}` : '', cam.x, cam.y].join('/');
     if (key !== shownKey) {
