@@ -26,6 +26,24 @@
   @keyframes fly { from { transform: translate(0, 0); } to { transform: translate(125vw, -60px); } }
   @keyframes blink { 50% { opacity: 0.25; } }
   @media (prefers-reduced-motion: reduce) { .sky-plane.flying { display: none; } }
+  /* Pressed, the set's badge names the plane: a ghost as Skyarium draws one, pale blue with its tag, flying a real
+     flight that's in the air on the station now. It climbs out through the open sky beside the set, from behind the
+     hills, since a level pass would mostly be hidden by the set. */
+  .sky-named { position: fixed; left: 3vw; top: 80vh; display: none; z-index: 3; pointer-events: none; }
+  .sky-named.flying { display: block; animation: climb 24s linear 1 forwards; }
+  @keyframes climb { from { transform: translate(0, 0); } to { transform: translate(13vw, -92vh); } }
+  .sky-named .plane { position: absolute; left: -150px; top: 40px; width: 190px; height: 22px; transform: rotate(-62deg); transform-origin: 100% 50%; }
+  .sky-named .plane::before { content: ""; position: absolute; left: 0; right: 8px; top: 10px; height: 2px;
+    background: linear-gradient(90deg, transparent, #9cc8ff33 60%, #cfe6ff99); }
+  .sky-named .plane::after { content: ""; position: absolute; right: 0; top: 6px; width: 10px; height: 10px; border-radius: 50%;
+    background: #cfe6ff; box-shadow: 0 0 12px 5px #9cc8ffaa; }
+  .sky-named .tag { position: absolute; left: 62px; top: 29px; white-space: nowrap;
+    font: 600 13px/1.35 -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; color: #e8f3ff;
+    padding: 7px 12px; background: rgba(18, 26, 48, 0.66); border: 1px dashed rgba(156, 200, 255, 0.6); border-radius: 14px; }
+  .sky-named .tag b { color: #9cc8ff; font-size: 10px; letter-spacing: 0.08em; margin-right: 6px; }
+  @media (prefers-reduced-motion: reduce) { .sky-named.flying { animation: none; transform: translate(6vw, -40vh); } }
+  .cabinet .badge { cursor: pointer; border: 0; padding: 0; background: none; }
+  .cabinet .badge:focus-visible { outline: 0.08em solid #f7c98b; outline-offset: 0.15em; }
   /* The set: a wood cabinet, the screen's dark bezel, and under it the maker's badge, the speaker and two knobs. Sizes
      in em of the cabinet's font size, which fit() sets from the screen's width. */
   .cabinet { position: absolute; border-radius: 0.9em; box-shadow: 0 1.4em 3em rgba(10, 6, 20, 0.6), inset 0 0.08em 0 rgba(255, 230, 200, 0.25), inset 0 -0.15em 0 rgba(0, 0, 0, 0.35);
@@ -101,14 +119,35 @@
 <body>
 <div class="stars" aria-hidden="true"></div>
 <div class="sky-plane" aria-hidden="true"></div>
+<div class="sky-named" aria-live="polite"><div class="plane"></div><span class="tag"></span></div>
 <script>
   // The plane overhead: a pass 20 seconds in, then one every four minutes.
   (() => {
     const plane = document.querySelector('.sky-plane');
     const pass = () => plane.classList.add('flying');
     plane.addEventListener('animationend', (e) => { if (e.animationName === 'fly') plane.classList.remove('flying'); });
+    const named = document.querySelector('.sky-named');
+    named.addEventListener('animationend', () => named.classList.remove('flying'));
     setTimeout(pass, 20000);
     setInterval(pass, 240000);
+    // The set's badge, pressed: Skyarium names the plane overhead. It loads the station's schedule engine once
+    // (feed.js), picks a flight in the air on the station right now, and sends it across as a ghost with its tag.
+    let engine = null;
+    const load = (src) => new Promise((ok, fail) => document.head.appendChild(Object.assign(document.createElement('script'), { src, onload: ok, onerror: fail })));
+    window.nameThePlane = async () => {
+      if (!engine) { await load('feed-data.js'); await load('feed.js'); engine = Ghostflights.engine(GHOSTFLIGHTS_DATA); }
+      const up = engine.airborne(Date.now()).filter((f) => f.alt > 9000);
+      if (!up.length) return;
+      const f = up[Math.floor(Math.random() * up.length)], a = GHOSTFLIGHTS_DATA.airlines[f.airline];
+      const city = (c) => (window.BOARD_CITIES || {})[c] || c;
+      const tag = named.querySelector('.tag');
+      tag.replaceChildren(Object.assign(document.createElement('b'), { textContent: 'GHOST' }),
+        `${(window.BOARD_SHORT || {})[f.airline] || a.name} ${f.number} · ${a.types[f.kind] || f.kind}`, document.createElement('br'),
+        `${city(f.from)} to ${city(f.to)} · ${f.alt.toLocaleString('en-US')} ft`);
+      named.classList.remove('flying');
+      named.getBoundingClientRect(); // so the climb starts over
+      named.classList.add('flying');
+    };
   })();
 </script>
 <svg class="land" viewBox="0 0 1440 300" preserveAspectRatio="none" aria-hidden="true">
@@ -118,7 +157,7 @@
 </svg>
 <div class="cabinet">
   <div class="bezel"></div>
-  <div class="panel"><span class="badge">Skyarium</span><span class="grille"></span>
+  <div class="panel"><button type="button" class="badge" title="What plane is that?" onclick="nameThePlane()">Skyarium</button><span class="grille"></span>
     <div class="control"><div class="dial"><span style="--a: -50deg">OFF</span><span style="--a: 50deg">ON</span><button class="knob volume" aria-label="Volume (M)"></button></div><span class="caption">VOLUME</span></div>
     <div class="control"><div class="dial"><button class="knob channel" aria-label="Channel: click the left side to go down, the right side to go up (or the arrow keys)"></button></div><span class="caption">CHANNEL</span></div>
   </div>
