@@ -106,21 +106,15 @@
 
   // The listing: a row per channel, then the station's notes, drawn once an hour onto a tall strip that scrolls.
   const CREDITS = [
-    ['About', 'Ghostflights is a TV station from 1985. Departed airlines fly their real schedules on painted route maps. The schedules are real and the flights are simulated.'],
-    ['Numbers', 'Flight numbers and times are as printed in each airline\'s timetable.'],
-    ['Northwest', 'System timetable of October 27 1985. Northwest Airlines History Center.'],
-    ['Republic', 'City schedules from 1984 to 1986. Northwest Airlines History Center.'],
-    ['Pan Am', 'System timetable of February 15 1985. University of Miami Libraries, Pan American World Airways, Inc. records.'],
-    ['Muse Air', 'System timetable of July 20 1985 as scanned at departedflights.com. Its types are from the February guide.'],
-    ['TranStar', 'Muse Air renamed itself TranStar in 1986. Here TranStar paint flies Muse\'s routes to California, Las Vegas and Florida.'],
-    ['The rest', 'Official Airline Guide of February 15 1985 as transcribed at departedflights.com.'],
-    ['Hughes Airwest and Braniff', 'Both were gone by 1985 and fly in 1979. Official Airline Guide of November 15 1979 as transcribed at departedflights.com.'],
-    ['Weather', 'This hour on this date in 1985 (1979 for Hughes Airwest and Braniff). Open-Meteo.com from the ERA5 archive.'],
-    ['Maps', 'Painted here from Natural Earth.'],
-    ['Planes', 'Painted from Open Liveries.'],
-    ['Knobs', 'Channel turns through 0 to 14. Volume turns the music on and off. M works too.'],
-    ['Data', 'The flights as data for your own projects and as timetables on a phone. ghostflights.tv/api'],
-    ['Station', 'A Skyarium station. skyarium.app'],
+    ['About', 'Ghostflights is a block of cable channels from 1985. Departed airlines fly their real schedules on painted route maps. The schedules are real and the flights are simulated.'],
+    ['Times', 'Flight numbers and times are as printed in each airline\'s timetable. Each airline\'s page at ghostflights.tv/airlines says which.'],
+    ['1979', 'Hughes Airwest and Braniff were gone by 1985. They fly their 1979 schedules.'],
+    ['Paint', 'The planes wear paint from Open Liveries. Midway flies in its 1979 sunset stripes. Muse Air\'s routes west and to Florida fly in TranStar colors. TranStar was its name from 1986.'],
+    ['Weather', 'The weather is this hour on this date in 1985 (1979 for Hughes Airwest and Braniff). It comes from Open-Meteo.com and the ERA5 archive.'],
+    ['Maps', 'The maps are painted here from Natural Earth.'],
+    ['Knobs', 'Channel turns through 0 to 18. Past 10 the numbers start again in gold. Volume turns the music on and off. M works too.'],
+    ['Data', 'The flights are free to use in your own projects at ghostflights.tv/api. Timetables for your phone are at ghostflights.tv/timetable.html.'],
+    ['Station', 'Ghostflights is a Skyarium station. skyarium.app'],
   ];
   const ROW = 52;
   const strip = document.createElement('canvas');
@@ -153,8 +147,8 @@
       block(24, y + 4, 54, ROW - 6, AMBER);
       text(`CH ${ch}`, 51, y + 32, 16, DEEP, 'center');
       text('Skyarium Presents', 88, y + 20, 15, WHITE);
-      text('Your slides of the airlines from airports all over.', 88, y + 34, 10, AMBER);
-      text('Sent in by viewers. More every week.', 88, y + 45, 9, QUIET);
+      text('Viewers\' slides of the airlines at their airports.', 88, y + 34, 10, AMBER);
+      text('With the weather and a word from our sponsors.', 88, y + 45, 9, QUIET);
       y += ROW;
     }
     y += 8;
