@@ -3,7 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ghostflights Timetables</title>
+<title>Ghostflights timetables: departed airlines&#x27; flights in the air now</title>
+<meta name="description" content="Ghostflights has departures boards for Pan Am, Northwest Orient, Eastern, Braniff and more from their real 1985 timetables. See which flights are in the air at this hour.">
+<link rel="canonical" href="https://ghostflights.tv/timetable.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Ghostflights">
+<meta property="og:title" content="Ghostflights timetables: departed airlines&#x27; flights in the air now">
+<meta property="og:description" content="Ghostflights has departures boards for Pan Am, Northwest Orient, Eastern, Braniff and more from their real 1985 timetables. See which flights are in the air at this hour.">
+<meta property="og:url" content="https://ghostflights.tv/timetable.html">
+<meta property="og:image" content="https://ghostflights.tv/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="site.css">
 <style>
   /* The phone's way in: each airline as a 1985 airport departures board, in the station's amber on its night navy
@@ -43,13 +52,25 @@
   .card dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 10px 0 0; font-size: 15px; }
   .card dt { color: var(--quiet); }
   .card .src { color: var(--quiet); font-size: 12px; margin-top: 14px; text-transform: none; letter-spacing: 0.01em; }
+  /* Where the flight is along its route: the two airports, the part flown in amber and the plane's light on it. */
+  .trip { margin: 4px 0 14px; text-transform: uppercase; }
+  .card .where { font-size: 17px; color: var(--amber); margin: 0 0 10px; text-transform: uppercase; }
+  .card .where .sky { display: block; color: var(--white); font-size: 14px; margin-top: 4px; text-transform: none; letter-spacing: 0.01em; }
+  .trip .ends, .trip .times { display: flex; justify-content: space-between; font-size: 15px; }
+  .trip .times { color: var(--quiet); font-size: 13px; }
+  .trip .track { position: relative; height: 14px; margin: 6px 7px; }
+  .trip .track::before { content: ""; position: absolute; left: 0; right: 0; top: 6px; height: 2px; background: var(--rule); }
+  .trip .done { position: absolute; left: 0; top: 6px; height: 2px; background: var(--amber); }
+  .trip .end { position: absolute; top: 3px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--white); }
+  .trip .now { position: absolute; top: 1px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--amber);
+    box-shadow: 0 0 8px 2px rgba(255, 191, 46, 0.55); }
   footer { color: var(--quiet); font-size: 12px; padding: 26px 16px 40px; line-height: 1.5; letter-spacing: 0.01em; }
   footer a { color: var(--amber); }
 </style>
 </head>
 <body>
 <header class="site"><a class="brand" href="index.html">GHOSTFLIGHTS</a>
-  <nav><a href="index.html?tv=1">Watch</a><a href="timetable.html" aria-current="page">Timetables</a><a href="about.html">About</a><a href="api.html">API</a></nav></header>
+  <nav><a href="index.html?tv=1">Watch</a><a href="timetable.html" aria-current="page">Timetables</a><a href="airlines/index.html">Airlines</a><a href="about.html">About</a><a href="api.html">API</a></nav></header>
 <div class="chipbar"><nav class="chips" id="chips"></nav></div>
 <main>
 <section class="hero" id="hero"></section>
@@ -113,6 +134,8 @@
         <div class="sub">${fl.name} · lands in ${Math.floor((lands - t) / 3600000)}h ${String(Math.round((lands - t) / 60000) % 60).padStart(2, '0')}m</div><div class="st">${st}</div></div>`;
     }).join('');
     document.querySelectorAll('#air .row').forEach((el) => { el.onclick = () => card(air[+el.dataset.i], code); });
+    const still = open && air.find((f) => f.key === open);
+    if (still) card(still, code); // the open card moves along with the list
 
     // Next departures: the airline's next twenty, at the time each leaves where it leaves.
     const deps = [];
@@ -134,18 +157,89 @@
   }
 
   // A flight's card: its plane big, where it is, and where its times come from.
+  // Where the flight is now, in words: "30 miles southeast of Chicago", or "Over the Gulf of Mexico" (and how far off
+  // the nearest city, when that's close). Its place is the one the broadcast draws: along the great circle between its
+  // airports, by its timetable times. Land or water from a small map loaded with the first card (landmask.js).
+  // In Skyarium (from 1.11) every flight leaving from 9 p.m. or landing by 7 a.m. flies again at night as a ghost; over
+  // land near a city, the card says so. Off until 1.11 is out.
+  const SKYARIUM_GHOSTS = false;
+  let mask = null;
+  const loadMask = () => (mask ||= new Promise((ok, fail) => document.head.appendChild(Object.assign(document.createElement('script'),
+    { src: 'landmask.js', onload: () => { // the runs unpacked into one byte a cell: 0 water, else a country's number
+      const L = window.LANDMASK, r = Uint8Array.from(atob(L.runs), (c) => c.charCodeAt(0)), cells = new Uint8Array(L.width * L.height);
+      for (let i = 0, o = 0; i < r.length; i += 2) { cells.fill(r[i], o, o + r[i + 1]); o += r[i + 1]; }
+      ok(Object.assign(L, { cells }));
+    }, onerror: fail }))));
+  const rad = Math.PI / 180;
+  function along([la1, lo1], [la2, lo2], u) { // a point u of the way along the great circle
+    const p1 = [la1 * rad, lo1 * rad], p2 = [la2 * rad, lo2 * rad];
+    const d = 2 * Math.asin(Math.sqrt(Math.sin((p2[0] - p1[0]) / 2) ** 2 + Math.cos(p1[0]) * Math.cos(p2[0]) * Math.sin((p2[1] - p1[1]) / 2) ** 2));
+    if (d === 0) return [la1, lo1];
+    const A = Math.sin((1 - u) * d) / Math.sin(d), Bk = Math.sin(u * d) / Math.sin(d);
+    const x = A * Math.cos(p1[0]) * Math.cos(p1[1]) + Bk * Math.cos(p2[0]) * Math.cos(p2[1]);
+    const y = A * Math.cos(p1[0]) * Math.sin(p1[1]) + Bk * Math.cos(p2[0]) * Math.sin(p2[1]);
+    const z = A * Math.sin(p1[0]) + Bk * Math.sin(p2[0]);
+    return [Math.atan2(z, Math.hypot(x, y)) / rad, Math.atan2(y, x) / rad];
+  }
+  const miles = ([la1, lo1], [la2, lo2]) => 3958.8 * 2 * Math.asin(Math.sqrt(Math.sin(((la2 - la1) * rad) / 2) ** 2 + Math.cos(la1 * rad) * Math.cos(la2 * rad) * Math.sin(((lo2 - lo1) * rad) / 2) ** 2));
+  const compass = ([la1, lo1], [la2, lo2]) => { // the direction from the first point to the second
+    const y = Math.sin((lo2 - lo1) * rad) * Math.cos(la2 * rad), x = Math.cos(la1 * rad) * Math.sin(la2 * rad) - Math.sin(la1 * rad) * Math.cos(la2 * rad) * Math.cos((lo2 - lo1) * rad);
+    return ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'][Math.round(((Math.atan2(y, x) / rad + 360) % 360) / 45) % 8];
+  };
+  function water(lat, lon) {
+    if (lat > 9 && lat < 22 && lon > -88 && lon < -59) return 'the Caribbean';
+    if (lat > 18 && lat < 31 && lon > -98 && lon < -80) return 'the Gulf of Mexico';
+    if (lat > 51 && lat < 66 && (lon > 162 || lon < -157)) return 'the Bering Sea';
+    if (lat > 50 && lat < 61 && lon > -160 && lon < -130) return 'the Gulf of Alaska';
+    if (lat > 30 && lat < 46 && lon > -6 && lon < 36) return 'the Mediterranean';
+    if (lat > 51 && lat < 61 && lon > -4 && lon < 10) return 'the North Sea';
+    if (lon < -100 || lon > 110) return 'the Pacific';
+    return 'the Atlantic';
+  }
+  async function whereNow(f) {
+    const P = D.positions, at = along(P[f.from], P[f.to], Math.min(1, Math.max(0, f.along)));
+    const L = await loadMask();
+    const cx = Math.floor((((at[1] + 180) % 360) + 360) % 360 / L.cell), cy = Math.floor((90 - at[0]) / L.cell);
+    const country = L.cells[cy * L.width + cx], onLand = country > 0;
+    let near = null, best = Infinity;
+    for (const [code, p] of Object.entries(P)) { const m = miles(p, at); if (m < best) { best = m; near = code; } }
+    const by = best < 8 ? `over ${city(near)}` : `${Math.round(best / 5) * 5 || 5} miles ${compass(P[near], at)} of ${city(near)}`;
+    // Far from any of the station's cities, the country it's over (the north of a big one, up there).
+    const land = L.names[country - 1] || 'land', north = at[0] > 58 && ['Canada', 'the Soviet Union'].includes(land);
+    const far = north ? land.replace(/^(the )?/, (the) => `${the}northern `) : land;
+    const words = !onLand ? `Over ${water(at[0], at[1])}${best < 200 ? `, ${by.replace(/^over /, 'off ')}` : ''}`
+      : best < 200 ? `Now ${by}` : `Over ${far}`;
+    // A ghost in Skyarium tonight: leaving from 9 p.m. or landing by 7 a.m. at its origin's clock, and over land near a city.
+    const A = D.airlines[f.airline], r = A.schedule.find((x) => x[0] === f.number && x[1] === f.from && x[2] === f.to);
+    const night = r && (r[3] >= 21 * 60 || (r[3] + r[5]) % 1440 <= 7 * 60);
+    const sky = SKYARIUM_GHOSTS && night && onLand && best < 150 ? `In Skyarium it's crossing the sky near ${city(near)} right now.` : '';
+    return { words, sky };
+  }
+  let open = null; // the flight on the card, kept up to date as the list redraws
+  const hm = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
   function card(f, code) {
+    open = f.key;
     const A = D.airlines[code], fl = paint(B.airlines[code].fleet[f.kind], f.number);
     const left = Math.max(0, Math.round((f.depart + f.block * 60000 - now()) / 60000));
+    const gone = Math.max(0, Math.round((now() - f.depart) / 60000)), pct = (100 * Math.min(1, Math.max(0, f.along))).toFixed(1);
+    const row = A.schedule.find((r) => r[0] === f.number && r[1] === f.from && r[2] === f.to);
     document.getElementById('cardBody').innerHTML = `<span class="close">Close ×</span><div class="big" style="padding-right: 70px">${A.code} ${f.number} · ${city(f.from)} → ${city(f.to)}</div>
       <img src="${sprite(fl)}" alt="">
+      <div class="trip"><div class="ends"><span>${f.from}</span><span>${f.to}</span></div>
+        <div class="track"><span class="end" style="left:0"></span><span class="end" style="left:100%"></span><span class="done" style="width:${pct}%"></span><span class="now" style="left:${pct}%"></span></div>
+        <div class="times"><span>${row ? `Departed ${localTime(f.depart, row[4]).replace(' ', '')}` : `Departed ${hm(gone)} ago`}</span><span>${hm(left)} to go</span></div></div>
+      <div class="where" id="where">&nbsp;</div>
       <dl><dt>Plane</dt><dd>${fl.name} · ${fl.scheme}</dd>
       <dt>Now</dt><dd>${f.along < 0.12 ? 'Climbing through' : f.along > 0.85 ? 'Descending through' : 'Cruising at'} ${(f.along < 0.12 || f.along > 0.85 ? f.alt : f.cruise).toLocaleString()} ft</dd>
-      <dt>Distance</dt><dd>${Math.round(f.nm).toLocaleString()} nautical miles · ${Math.floor(left / 60)}h ${left % 60}m to go</dd></dl>
+      <dt>Distance</dt><dd>${Math.round(f.nm).toLocaleString()} nautical miles</dd></dl>
       <div class="src">Times from: ${A.source}. The position is simulated.</div>`;
     document.getElementById('card').classList.add('on');
+    whereNow(f).then(({ words, sky }) => {
+      const el = document.getElementById('where');
+      if (el && open === f.key) el.innerHTML = words + (sky ? `<span class="sky">${sky}</span>` : '');
+    }).catch(() => {});
   }
-  document.getElementById('card').onclick = () => document.getElementById('card').classList.remove('on');
+  document.getElementById('card').onclick = () => { document.getElementById('card').classList.remove('on'); open = null; };
 
   draw();
   setInterval(draw, 30000);
