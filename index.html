@@ -146,16 +146,8 @@
   const set = document.querySelector('.set'), screen = set.querySelector('iframe');
   const channelKnob = document.querySelector('.knob.channel'), volumeKnob = document.querySelector('.knob.volume');
 
-  // The channel to start on when none is asked for: the viewer's own region, by the time zone the browser reports.
-  function homeChannel() {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-    // The airline that flew most where the viewer is: Western out West, Northwest in the middle, Eastern in the East.
-    if (/^America\/(Los_Angeles|Vancouver|Tijuana|Anchorage|Juneau|Sitka|Nome|Phoenix|Denver|Boise|Edmonton|Whitehorse)|^Pacific\/Honolulu/.test(tz)) return '4';
-    if (/^America\/(Chicago|Winnipeg|Menominee|North_Dakota|Indiana\/(Knox|Tell_City))/.test(tz)) return '1';
-    if (/^America\/(New_York|Detroit|Toronto|Indiana|Kentucky|Louisville)/.test(tz)) return '3';
-    return '1';
-  }
-  let ch = CHS.includes(params.get('ch')) ? params.get('ch') : homeChannel();
+  // The set comes on to the guide (channel 0) unless a channel is asked for (?ch=).
+  let ch = CHS.includes(params.get('ch')) ? params.get('ch') : '0';
   const chName = (c) => (c === '0' ? 'GUIDE' : `CH ${c.padStart(2, '0')}`);
 
   // Snow between channels, then the picture rolls in and the set shows the channel number.
