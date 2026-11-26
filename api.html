@@ -23,7 +23,7 @@
 
 <h2>Not real traffic</h2>
 <ul>
-  <li>Every record says <code>"simulated": true</code> and the year it's set in. That's 1985, or 1979 for Hughes Airwest and Braniff International.</li>
+  <li>Every record says <code>"simulated": true</code> and the year it's set in. That's 1985 except for Hughes Airwest and Braniff International, which are set in 1979.</li>
   <li>There's no ICAO address on anything. Nothing here is shaped to slip into a real tracker.</li>
   <li>Flight numbers come only from a printed timetable. The feed never makes one up.</li>
   <li>Only airlines that are gone. No airline flying today appears, not even in its old paint.</li>
@@ -37,7 +37,7 @@
 </table></div>
 
 <h2>Use it</h2>
-<p>It runs in the page with no server. Two files hold everything: <a href="feed.js">feed.js</a>, the schedule engine, and <a href="feed-data.js">feed-data.js</a>, the schedules. The flights come from the clock, so every copy agrees.</p>
+<p>It runs in the page with no server. Two files hold everything. <a href="feed.js">feed.js</a> is the schedule engine and <a href="feed-data.js">feed-data.js</a> holds the schedules. The flights come from the clock and every copy agrees.</p>
 <pre>&lt;script src="feed-data.js"&gt;&lt;/script&gt;
 &lt;script src="feed.js"&gt;&lt;/script&gt;
 &lt;script&gt;
@@ -56,7 +56,7 @@ console.log(globalThis.Ghostflights.feed());</pre>
   <li>Northwest Orient: the system timetable of October 27, 1985, from the Northwest Airlines History Center.</li>
   <li>Republic: city schedules from 1984 to 1986, from the Northwest Airlines History Center.</li>
   <li>Pan Am: its own system timetable of February 15, 1985, from the University of Miami Libraries' Pan Am collection.</li>
-  <li>The rest: the Official Airline Guide of February 15, 1985, or of November 15, 1979 for Hughes Airwest and Braniff International, as transcribed at <a href="https://www.departedflights.com/">departedflights.com</a>.</li>
+  <li>The rest: the Official Airline Guide of February 15, 1985 (November 15, 1979 for Hughes Airwest and Braniff International) as transcribed at <a href="https://www.departedflights.com/">departedflights.com</a>.</li>
 </ul>
 <p>Each flight runs on the weekday it flew in its year for today's date. Positions follow the great circle between the two airports. Altitude and speed are estimates from the distance and the scheduled time.</p>
 
