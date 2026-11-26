@@ -4,7 +4,7 @@
 // the character generator (ICONS below).
 window.SPONSORS = (() => {
   const S = (name, icon, lines, where, phone, bg, ink) => ({ name, icon, lines, where, phone, bg, ink });
-  const skyarium = (city) => S('Skyarium', 'sky', [`Look up over ${city}.`, 'Every plane in the sky above you, named.'],
+  const skyarium = (city) => S('Skyarium', 'sky', [`Look up over ${city}.`, 'It puts a name to every plane above you.'],
     'For your telephone. skyarium.app', null, '#141838', '#f7c98b');
   return {
     NWA: [
