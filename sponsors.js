@@ -111,6 +111,14 @@ window.SPONSORS = (() => {
       S('Eighteenth & Vine Records', 'record', ['Jazz and blues on vinyl.', 'Live music Saturday afternoons.'], 'Kansas City', '555-0194', '#1a1a1a', '#ff7a7a'),
       skyarium('Dallas'),
     ],
+    ML1979: [
+      S('Cicero Avenue Lanes', 'bowling', ['36 lanes and a pro shop.', 'Midnight bowling on Fridays.'], 'Across from Midway', '555-0107', '#16324a', '#ffd23c'),
+      S('Archer Avenue Beef', 'food', ['Italian beef dipped or dry.', 'Open late for the night crews.'], 'Chicago, near Midway', '555-0111', '#3a1a0e', '#ffcf6a'),
+      S('Southwest Side TV', 'tv', ['Color sets fixed while you wait.', 'House calls on the South Side.'], 'Chicago', '555-0126', '#3b2a1c', '#ffcf8a'),
+      S('Lake Shore Motor Lodge', 'motel', ['Color TV and an indoor pool.', 'Ten minutes from Midway.'], 'Chicago', '555-0129', '#4a1a14', '#ffb070'),
+      S('Pinball Palace', 'arcade', ['Pinball and forty video games.', 'Tokens four for a dollar.'], 'Chicago', '555-0130', '#1a1030', '#ff7ae0'),
+      skyarium('Chicago'),
+    ],
     CO1934: [
       S('Bayou City Bowl', 'bowling', ['40 lanes and a cocktail lounge.', 'Leagues every night.'], 'Houston, near Intercontinental', '555-0105', '#16324a', '#ffd23c'),
       S('Gulfgate Steakhouse', 'food', ['Chicken-fried steak and Gulf shrimp.', 'Open late for the last flights in.'], 'Houston', '555-0125', '#3a1a0e', '#ffcf6a'),
