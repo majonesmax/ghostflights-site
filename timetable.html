@@ -139,7 +139,7 @@
     const date = then.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
     const kinds = Object.keys(fleet), star = ['B747', 'DC10', 'L101', 'L15', 'A30B', 'B722'].find((k) => fleet[k]) || kinds[0];
     document.getElementById('hero').innerHTML = `<h1>${A.name}</h1><div class="when">${date} · ${clock(t, board.tz)}</div>
-      <img src="${sprite(fleet[star].paints ? fleet[star].paints[0] : fleet[star])}" alt=""><div class="paint">${kinds.map((k) => fleet[k].name).join(' · ')}</div>`;
+      <img src="${sprite(fleet[star].paints ? fleet[star].paints[0] : fleet[star])}" alt=""><div class="paint">${[...new Set(kinds.map((k) => fleet[k].name))].join(' · ')}</div>`;
 
     // In the air: every flight of this airline aloft now, the longest flights first.
     const air = G.engine(D).airborne(t).filter((f) => f.airline === code).sort((a, b) => b.nm - a.nm);
