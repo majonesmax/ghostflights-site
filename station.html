@@ -11,6 +11,11 @@
   /* The tape look goes on the lens, which is the frame's size, not on the camera inside it: on the camera it was
      filtered at the zoom (three times the frame each way on a close shot) and Chrome dropped tiles. */
   .lens { position: absolute; inset: 0; overflow: hidden; filter: url(#tape) saturate(1.02) contrast(1.05); }
+  /* Safari runs SVG filters on the processor, over the whole picture every time a plane moves, and it stalled the page
+     (the crawl stuttered). There the tape is a plain CSS blur, which it does on the graphics card: the same softness
+     without the red bleed. */
+  .safari .lens { filter: blur(0.55px) saturate(1.02) contrast(1.05); }
+  .safari img.cardplane { filter: blur(0.55px) drop-shadow(10px 14px 6px rgba(10, 8, 30, 0.5)); }
   .camera { position: absolute; left: 0; top: 0; width: 1440px; height: 1080px; transform-origin: 0 0; }
   .board { position: absolute; inset: 0; width: 1440px; height: 1080px; }
   .board.labels { pointer-events: none; } /* the cities, over the route lines */
@@ -93,6 +98,10 @@
     <feComposite in="glow" in2="rgb" operator="arithmetic" k2="0.25" k3="1"/>
   </filter>
 </svg>
+<script>
+  // Safari (and every browser on an iPhone or iPad, which is Safari underneath): see .safari above.
+  if (/^((?!chrome|chromium|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent) || /iP(hone|ad|od)/.test(navigator.userAgent)) document.documentElement.classList.add('safari');
+</script>
 <div class="stage"><div class="frame">
   <div class="lens"><div class="camera">
     <img class="board" alt="">
@@ -633,13 +642,22 @@
       crawlBand = true;
     }
     const key = `${crawl.for}|${crawl.start}`;
-    if (strip.for !== key) renderStrip(key);
+    if (strip.for !== key) { renderStrip(key); slide(t); }
     if (strip.active !== activeKey) {
       const was = strip.active;
       strip.active = activeKey;
       for (const k of [was, activeKey]) if (k) rekey(strip.spans[k]); // only the tiles the old and new item are on
     }
-    stripEl.style.transform = `translate3d(${Math.round(crawlX(t) * 3)}px, 0, 0)`;
+  }
+  // The crawl's movement, handed to the browser as an animation (it runs on its own, off this page's busy frames: a
+  // transform set here twenty times a second stalled whenever the page was busy, worst in Safari). It starts where
+  // crawlX puts the crawl now and goes round at the same speed, so the reading point and the featured flight agree.
+  let sliding = null;
+  function slide(t) {
+    if (sliding) sliding.cancel();
+    const loop = crawl.total + 480, into = ((t - crawl.start) / 1000 / SPEED * CRAWL_SPEED + 480 - READ_X) % loop;
+    sliding = stripEl.animate([{ transform: 'translate3d(1440px, 0, 0)' }, { transform: `translate3d(${(480 - loop) * 3}px, 0, 0)` }],
+      { duration: (loop / CRAWL_SPEED) * 1000, delay: -(into / CRAWL_SPEED) * 1000, iterations: Infinity, easing: 'linear' });
   }
 
   // The crawl's text, the whole line at the character generator's 480 lines, then keyed into tiles at the frame's
@@ -661,7 +679,14 @@
     }
     strip = { for: key, active: crawlActive(now()), spans, line, tiles, width };
     paintLine(0, width);
-    tiles.forEach((_, i) => keyTile(i));
+    // The tiles on screen now keyed at once, the rest a tile at a time between frames, well before they scroll in
+    // (keying them all at once froze the crawl at every cut in Safari).
+    const left = crawlX(now()), first = Math.max(0, Math.floor(-left / TILE)), last = Math.min(tiles.length - 1, Math.floor((480 - left) / TILE));
+    for (let i = first; i <= last; i++) keyTile(i);
+    const rest = tiles.map((_, i) => i).filter((i) => i < first || i > last);
+    const owner = key;
+    const next = () => { if (strip.for !== owner || !rest.length) return; keyTile(rest.shift()); setTimeout(next, 30); };
+    setTimeout(next, 30);
   }
   // The line's text between two of its x's, each item lit or not.
   function paintLine(from, to) {
@@ -902,8 +927,9 @@
     // A cutout that won't bake shows its plain drawing rather than stop the broadcast.
     await Promise.all(sprites.map((src) => bake(src).catch(() => baked.set(src, window.SPRITES[src]))));
     bakeBig(sprites.filter((s) => s.endsWith('-left.svg'))); // the card and the break only show the left side
-    await loadWeather(now());
-    updateWeather(now());
+    // The weather loads in the background: the channel comes on without waiting for the archive (its segment shows once
+    // it's in; the frame loop picks it up). Waiting for it held the static up on every channel change.
+    loadWeather(now()).then(() => updateWeather(now()));
     frame();
     setInterval(frame, 50); // twenty frames a second is plenty for a character generator
     await boardReady.catch(() => {}); // shown even so after three tries, rather than snow for ever

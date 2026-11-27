@@ -8,10 +8,13 @@
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
   .stage { position: absolute; left: 50%; top: 50%; width: 1440px; height: 1080px; transform-origin: 0 0; }
   .frame { position: relative; width: 1440px; height: 1080px; overflow: hidden;
-    background: linear-gradient(180deg, #1b2a6e 0%, #121c4f 42%, #0c1338 100%); filter: url(#tape); }
-  canvas { position: absolute; left: 0; width: 1440px; image-rendering: pixelated; filter: url(#key); }
+    background: linear-gradient(180deg, #1b2a6e 0%, #121c4f 42%, #0c1338 100%); }
+  /* The key look is baked into these (Channel.keyInto), not a live filter: Safari redid one every frame the list moved. */
+  canvas { position: absolute; left: 0; width: 1440px; image-rendering: pixelated; }
   canvas.still { top: 0; height: 1080px; }
-  canvas.listing { top: 498px; height: 519px; }
+  .listwin { position: absolute; left: 0; top: 498px; width: 1440px; height: 519px; overflow: hidden; }
+  .liststrip { position: absolute; left: 0; top: 0; will-change: transform; }
+  .liststrip canvas { position: static; display: block; }
   .light { position: absolute; inset: 0; mix-blend-mode: multiply; pointer-events: none;
     background: radial-gradient(ellipse 80% 75% at 46% 44%, #ffffff 0%, #eef0ff 55%, #9aa0c4 100%); }
   .scan { position: absolute; inset: 0; pointer-events: none;
@@ -37,8 +40,8 @@
   </filter>
 </svg>
 <div class="stage"><div class="frame">
-  <canvas class="still" width="480" height="360"></canvas>
-  <canvas class="listing" width="480" height="173"></canvas>
+  <canvas class="still" width="1440" height="1080"></canvas>
+  <div class="listwin"><div class="liststrip"></div></div>
   <div class="light"></div>
   <div class="scan"></div>
 </div></div>
@@ -84,7 +87,9 @@
 
 
   // The top: the station, the guide, the viewer's own time and today's date in 1985.
-  const still = document.querySelector('canvas.still');
+  // Drawn at the character generator's 480 lines, then keyed onto the screen's canvas at three times that.
+  const stillOut = document.querySelector('canvas.still').getContext('2d');
+  const still = Object.assign(document.createElement('canvas'), { width: 480, height: 360 });
   const local = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
   const longDate = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   let stillKey = '';
@@ -102,6 +107,7 @@
     text('Departed airlines fly their 1985 schedules all day long.', 24, 132, 12, WHITE);
     text('Turn the channel knob on the set or use the arrow keys.', 24, 148, 11, QUIET);
     finish(still);
+    Channel.keyInto(still, 0, 0, 480, 360, stillOut);
   }
 
   // The listing: a row per channel, then the station's notes, drawn once an hour onto a tall strip that scrolls.
@@ -164,22 +170,36 @@
     finish(strip);
   }
 
-  // The strip scrolls up 16 of its pixels a second and comes round again.
-  const listing = document.querySelector('canvas.listing'), lctx = listing.getContext('2d');
-  function frame() {
+  // The strip scrolls up 16 of its pixels a second and comes round again: keyed once when it's drawn (each hour), two
+  // copies end to end, moved by a transform the browser does on its own, with nothing redrawn as it goes.
+  const stripEl = document.querySelector('.liststrip');
+  let keyedFor = -1;
+  function keyStrip() {
+    if (keyedFor === stripHour) return;
+    keyedFor = stripHour;
+    const keyed = Object.assign(document.createElement('canvas'), { width: 1440, height: strip.used * 3 });
+    Channel.keyInto(strip, 0, 0, 480, strip.used, keyed.getContext('2d'));
+    const copy = Object.assign(document.createElement('canvas'), { width: 1440, height: strip.used * 3 });
+    copy.getContext('2d').drawImage(keyed, 0, 0);
+    stripEl.replaceChildren(keyed, copy);
+  }
+  function tick() {
     const t = now();
     drawStill(t);
     drawStrip(t);
+    keyStrip();
+  }
+  function scroll() {
     const y = ((Date.now() - START_REAL) / 1000 * 16) % strip.used;
-    lctx.clearRect(0, 0, 480, 173);
-    lctx.drawImage(strip, 0, -y);
-    if (strip.used - y < 173) lctx.drawImage(strip, 0, strip.used - y);
+    stripEl.style.transform = `translateY(${-y * 3}px)`;
+    requestAnimationFrame(scroll);
   }
 
   new FontFace('CG', `url(${window.CG_FONT})`).load().then((font) => {
     document.fonts.add(font);
-    frame();
-    setInterval(frame, 50);
+    tick();
+    setInterval(tick, 1000);
+    scroll();
     toSet({ ready: '0' });
   });
 </script>

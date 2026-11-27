@@ -207,7 +207,7 @@
     // Far from any of the station's cities, the country it's over (the north of a big one, up there).
     // Over land a city names the place out to 500 miles ("340 miles northwest of Juneau" says more than "Over Canada");
     // farther than that, the country, or Alaska, or the north of a big one.
-    const land = L.names[country - 1] || 'land', north = at[0] > 58 && ['Canada', 'Russia'].includes(land);
+    const land = L.names[country - 1] || 'land', north = at[0] > 58 && ['Canada', 'the Soviet Union'].includes(land);
     const alaska = land === 'the United States' && at[0] > 51 && at[1] < -129;
     const far = alaska ? 'Alaska' : north ? land.replace(/^(the )?/, (the) => `${the}northern `) : land;
     const words = !onLand ? `Over ${water(at[0], at[1])}${best < 200 ? `, ${by.replace(/^over /, 'off ')}` : ''}`

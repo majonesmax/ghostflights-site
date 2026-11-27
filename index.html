@@ -120,7 +120,13 @@
   .set iframe { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 0; }
   .set.rolling iframe { animation: roll 0.42s cubic-bezier(0.2, 0.7, 0.3, 1); }
   @keyframes roll { 0% { top: -22%; } 70% { top: 2%; } 100% { top: 0; } }
-  canvas.snow { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  /* The static between channels: eight frames of noise drawn once, flipped through by a CSS animation the browser runs
+     on its own, so it doesn't stall while the next channel's page loads (it did in Safari, drawn by script). */
+  .snow { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .snow canvas.noise { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  .snow .frames { position: absolute; left: 0; top: 0; width: 100%; height: 800%; background-size: 100% 100%; image-rendering: pixelated;
+    animation: hiss 0.32s steps(8) infinite; will-change: transform; }
+  @keyframes hiss { to { transform: translateY(-100%); } }
   /* The set's own on-screen display (not the station's graphics): green, blocky, top left, for a moment. */
   .osd { position: absolute; left: 5.8%; top: 6%; font: 700 1em/1 Menlo, 'Courier New', monospace; letter-spacing: 0.1em;
     color: #4cf08a; text-shadow: 0 0 0.18em rgba(76, 240, 138, 0.55), 0.06em 0.06em 0 #000; display: none; pointer-events: none; }
@@ -175,7 +181,7 @@
 <div class="set">
   <iframe title="Ghostflights"></iframe>
   <iframe class="national" title="Ghostflights, across the country" style="visibility: hidden"></iframe>
-  <canvas class="snow" width="160" height="120"></canvas>
+  <div class="snow"><div class="frames"></div></div>
   <div class="osd"></div>
 </div>
 <div class="dock"></div>
@@ -206,15 +212,38 @@
   const chName = (c) => (c === '0' ? 'GUIDE' : `CH ${c.padStart(2, '0')}`);
 
   // Snow between channels, then the picture rolls in and the set shows the channel number.
-  const snow = set.querySelector('canvas.snow'), snowCtx = snow.getContext('2d');
-  let snowing = false;
-  function hiss() {
-    if (!snowing) return;
-    const img = snowCtx.createImageData(160, 120);
-    for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
-    snowCtx.putImageData(img, 0, 0);
-    requestAnimationFrame(hiss);
+  const snow = set.querySelector('.snow');
+  // The static is drawn by a worker of its own on a canvas handed to it (OffscreenCanvas), so nothing the page does
+  // while the next channel loads can hold it up. Where a browser can't, eight pre-drawn frames flipped by CSS.
+  let hissWorker = null;
+  {
+    const c = Object.assign(document.createElement('canvas'), { width: 160, height: 120 });
+    if (c.transferControlToOffscreen && window.Worker) {
+      c.className = 'noise';
+      snow.replaceChildren(c);
+      const src = `let g = null, on = false, timer = 0;
+        onmessage = (e) => {
+          if (e.data.canvas) g = e.data.canvas.getContext('2d');
+          if ('on' in e.data) { on = e.data.on; clearInterval(timer); if (on) timer = setInterval(draw, 33); }
+        };
+        function draw() {
+          const img = g.createImageData(160, 120), d = img.data;
+          for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+          g.putImageData(img, 0, 0);
+        }`;
+      hissWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      const off = c.transferControlToOffscreen();
+      hissWorker.postMessage({ canvas: off }, [off]);
+    } else {
+      c.height = 960;
+      const g = c.getContext('2d'), img = g.createImageData(160, 960);
+      for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+      g.putImageData(img, 0, 0);
+      snow.firstChild.style.backgroundImage = `url(${c.toDataURL()})`;
+    }
   }
+  const hiss = (on) => hissWorker && hissWorker.postMessage({ on });
+  let snowing = false;
   // The channel knob: the channels round its skirt, the one at the top (under the pointer) on. It turns all the way
   // round, past the last channel to 0 and on, always the short way.
   const NOTCH = 360 / CHS.length;
@@ -246,7 +275,7 @@
     document.title = `Ghostflights · CH ${ch}`;
     set.classList.remove('rolling');
     snow.style.transition = 'none'; snow.style.opacity = 1; snow.style.display = 'block';
-    if (!snowing) { snowing = true; hiss(); }
+    snowing = true; hiss(true);
     osd(chName(ch), 60000);
     Muzak.tune(ch); // the music cuts to static until the picture is in
     screen.src = window.PHONE ? `phone.html?ch=${ch}` : `${page(ch)}.html?${q}`;
@@ -255,8 +284,8 @@
     clearTimeout(watchdog);
     void set.offsetWidth; // restart the roll
     set.classList.add('rolling');
-    snow.style.transition = 'opacity 0.45s'; snow.style.opacity = 0;
-    setTimeout(() => { snowing = false; snow.style.display = 'none'; }, 500);
+    snow.style.transition = 'opacity 0.2s'; snow.style.opacity = 0; // a quick cut, as a set's tuner did
+    setTimeout(() => { snowing = false; hiss(false); snow.style.display = 'none'; }, 220);
     osd(chName(ch), 2600);
     Muzak.tunedIn(); // and this channel's music comes in where it is
   }

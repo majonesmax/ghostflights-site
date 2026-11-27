@@ -10,7 +10,7 @@
   .stage { position: absolute; left: 50%; top: 50%; width: 1440px; height: 1080px; transform-origin: 0 0; }
   .frame { position: relative; width: 1440px; height: 1080px; overflow: hidden; background: #000; }
   /* The slide, slowly drifting in like a camera on a slide on an easel; two of them so one fades into the next. */
-  img.slide { position: absolute; inset: 0; width: 1440px; height: 1080px; opacity: 0; filter: url(#tape);
+  img.slide { position: absolute; inset: 0; width: 1440px; height: 1080px; opacity: 0; filter: blur(0.6px); /* a CSS blur (the graphics card does it, in Safari too), not an SVG filter */
     transition: opacity 1.2s linear; will-change: transform, opacity; }
   img.slide.on { opacity: 1; }
   canvas { position: absolute; left: 0; width: 1440px; image-rendering: pixelated; }

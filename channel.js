@@ -64,5 +64,31 @@
     },
   };
 
-  window.Channel = { toSet, params, SPEED, START, START_REAL, now: () => START + (Date.now() - START_REAL) * SPEED, cg };
+  // The key look (a station's character generator over its picture: the letters a little smeared, red shifted right,
+  // blue left) baked into a canvas three times the size, once, instead of an SVG filter rerun on every frame (Safari
+  // runs those on the processor: a scrolling list under one crawled). From the station's keyInto.
+  const tints = {};
+  const offscreen = (w, h) => Object.assign(document.createElement('canvas'), { width: w, height: h }).getContext('2d');
+  function keyInto(src, sx, sy, sw, sh, out) {
+    const w = sw * 3, h = sh * 3, k = `${w}x${h}`;
+    const tint = (tints[k] ||= offscreen(w, h));
+    out.clearRect(0, 0, w, h);
+    for (const [color, dx] of [['#ff0000', 2], ['#00ff00', 0], ['#0000ff', -1.5]]) {
+      tint.globalCompositeOperation = 'copy';
+      tint.imageSmoothingEnabled = false;
+      tint.filter = 'blur(0.6px)';
+      tint.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+      tint.filter = 'none';
+      tint.globalCompositeOperation = 'multiply';
+      tint.fillStyle = color;
+      tint.fillRect(0, 0, w, h);
+      tint.globalCompositeOperation = 'destination-in';
+      tint.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+      out.globalCompositeOperation = 'lighter';
+      out.drawImage(tint.canvas, dx, 0);
+    }
+    out.globalCompositeOperation = 'source-over';
+  }
+
+  window.Channel = { toSet, params, SPEED, START, START_REAL, now: () => START + (Date.now() - START_REAL) * SPEED, cg, keyInto };
 })();
