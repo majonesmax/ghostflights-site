@@ -411,7 +411,7 @@
   const clock = new Intl.DateTimeFormat('en-US', { timeZone: BD.tz, hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
   // The broadcast is set in 1985: the weather is this hour on this date in 1985, from Open-Meteo's archive of the
-  // ERA5 reanalysis (CC BY 4.0), at the board's bigger cities. Real history, said plainly. Without it there's no
+  // ERA5 reanalysis (CC BY 4.0), kept on the site a day to a file, at the board's bigger cities. Real history, said plainly. Without it there's no
   // weather segment: it's never made up.
   const YEAR = (BD.airline && B.airlines[BD.airline].year) || 1985; // the board's airline's year
   const WX_CITIES = BD.weather;
@@ -428,14 +428,9 @@
     const date = thenDate(t);
     if (days[date]) return;
     days[date] = 'loading';
-    try {
-      const lat = WX_CITIES.map((c) => B.positions[c][0]).join(), lon = WX_CITIES.map((c) => B.positions[c][1]).join();
-      const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&hourly=temperature_2m,weather_code,is_day&temperature_unit=fahrenheit&timezone=${encodeURIComponent(BD.tz)}`);
-      if (!r.ok) throw new Error(r.status);
-      days[date] = (await r.json()).map((c) => c.hourly);
-    } catch {
-      delete days[date]; // tried again at the next step
-    }
+    // The site's own copy of the archive (sim/weather/, tools/build_weather.py), one small file a day.
+    const hours = await Channel.weatherDay(YEAR, date, BD.tz, WX_CITIES);
+    if (hours) days[date] = hours; else delete days[date]; // tried again at the next step
   }
   // This hour's conditions (the board's hour on the 1985 date), and the magnets moved when the hour changes.
   function updateWeather(t) {

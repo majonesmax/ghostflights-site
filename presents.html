@@ -145,11 +145,10 @@
   }
 
   // The crawl: the weather across the country, this hour on this date in 1985 (Open-Meteo's archive of the ERA5
-  // reanalysis, CC BY 4.0, as the airline channels have it; never made up), at the slides' airports, with a short
+  // reanalysis, CC BY 4.0, kept on the site a day to a file as the airline channels have it; never made up), at the slides' airports, with a short
   // word from Skyarium about every 35 seconds. Drawn into a strip that slides; drawn again when the hour turns.
-  const WX = [['New York', 40.64, -73.78], ['Chicago', 41.79, -87.75], ['Dallas', 32.9, -97.04], ['Houston', 29.98, -95.34],
-    ['Miami', 25.79, -80.29], ['Minneapolis', 44.88, -93.22], ['St. Louis', 38.75, -90.37], ['Pittsburgh', 40.49, -80.23],
-    ['Charlotte', 35.21, -80.94], ['Salt Lake City', 40.79, -111.98], ['San Diego', 32.73, -117.19]];
+  const WX = [['New York', 'JFK'], ['Chicago', 'MDW'], ['Dallas', 'DFW'], ['Houston', 'IAH'], ['Miami', 'MIA'], ['Minneapolis', 'MSP'],
+    ['St. Louis', 'STL'], ['Pittsburgh', 'PIT'], ['Charlotte', 'CLT'], ['Salt Lake City', 'SLC'], ['San Diego', 'SAN']];
   const PLUGS = [
     'Skyarium names every plane over your house',
     'Look up with Skyarium. It\'s free',
@@ -166,12 +165,7 @@
   const days = {};
   async function weatherAt(t) {
     const date = thenDate(t);
-    if (!days[date]) {
-      days[date] = fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${WX.map((c) => c[1])}&longitude=${WX.map((c) => c[2])}`
-        + `&start_date=${date}&end_date=${date}&hourly=temperature_2m,weather_code,is_day&temperature_unit=fahrenheit&timezone=${encodeURIComponent(TZ)}`)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r.status))).then((j) => j.map((c) => c.hourly))
-        .catch(() => { delete days[date]; return null; });
-    }
+    days[date] ||= Channel.weatherDay(1985, date, TZ, WX.map((c) => c[1])).then((h) => { if (!h) delete days[date]; return h; });
     const hours = await days[date], h = parts(t).hour;
     if (!hours) return null;
     return WX.map(([name], i) => `${name} ${Math.round(hours[i].temperature_2m[h])}° ${sky(hours[i].weather_code[h])}`);

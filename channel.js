@@ -90,5 +90,40 @@
     out.globalCompositeOperation = 'source-over';
   }
 
-  window.Channel = { toSet, params, SPEED, START, START_REAL, now: () => START + (Date.now() - START_REAL) * SPEED, cg, keyInto };
+  // The weather, from the site's own daily files (tools/build_weather.py: Open-Meteo's archive of ERA5, CC BY 4.0), not
+  // a request to the archive from every viewer. weatherDay(year, 'YYYY-MM-DD', tz, cities) gives each city's 24 hours of
+  // that local date in tz, as the archive's hourly lists (temperature_2m, weather_code, is_day), or null without them.
+  const wxDays = {};
+  const loadDay = (date) => (wxDays[date] ||= new Promise((ok) => {
+    if (window.WEATHER && window.WEATHER[date]) return ok(window.WEATHER[date]);
+    const el = Object.assign(document.createElement('script'), { src: `weather/${date.slice(0, 4)}/${date.slice(5)}.js` });
+    el.onload = () => ok((window.WEATHER || {})[date] || null);
+    el.onerror = () => { delete wxDays[date]; ok(null); };
+    document.head.append(el);
+  }));
+  // Minutes tz is ahead of UTC at a moment (the 1985 rules, from the browser's time zone data).
+  const tzAhead = (tz, ms) => {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
+      .formatToParts(new Date(ms)).map((x) => [x.type, +x.value]));
+    return (Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - ms) / 60000;
+  };
+  async function weatherDay(year, date, tz, cities) {
+    const [y, m, d] = date.split('-').map(Number);
+    const hours = [...Array(24).keys()].map((h) => { const guess = Date.UTC(y, m - 1, d, h); return guess - tzAhead(tz, guess) * 60000; });
+    const files = await Promise.all([...new Set(hours.map((ms) => new Date(ms).toISOString().slice(0, 10)))].map(async (k) => [k, await loadDay(k)]));
+    const byDate = Object.fromEntries(files);
+    if (files.some(([, f]) => !f)) return null;
+    return cities.map((code) => {
+      const out = { temperature_2m: [], weather_code: [], is_day: [] };
+      for (const ms of hours) {
+        const f = byDate[new Date(ms).toISOString().slice(0, 10)], i = f.cities.indexOf(code), h = new Date(ms).getUTCHours();
+        out.temperature_2m.push(i < 0 ? null : f.t[i][h]);
+        out.weather_code.push(i < 0 ? null : f.code[i][h]);
+        out.is_day.push(i < 0 ? 1 : +f.day[i][h]);
+      }
+      return out;
+    });
+  }
+
+  window.Channel = { toSet, params, SPEED, START, START_REAL, now: () => START + (Date.now() - START_REAL) * SPEED, cg, keyInto, weatherDay };
 })();
